@@ -12,36 +12,82 @@ import './App.css'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const PERIODS_PER_DAY = 8
 
+function buildCatalogFromSubjects(subjects) {
+  const seen = new Map()
+  for (const subject of subjects) {
+    const key = subject.name?.toLowerCase()
+    if (!key || seen.has(key)) continue
+    seen.set(key, {
+      id: subject.catalogId || `catalog-${seen.size + 1}-${Date.now()}`,
+      name: subject.name,
+    })
+  }
+  return [...seen.values()]
+}
+
+function attachCatalogIds(subjects, catalog) {
+  const byName = new Map(catalog.map((entry) => [entry.name.toLowerCase(), entry.id]))
+  return subjects.map((subject) => ({
+    ...subject,
+    catalogId: subject.catalogId || byName.get(subject.name?.toLowerCase()) || null,
+  }))
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('subjects')
+  const [subjectCatalog, setSubjectCatalog] = useState([])
   const [subjects, setSubjects] = useState([])
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
   const [timetable, setTimetable] = useState(null)
   const [error, setError] = useState('')
 
-  // Load from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem('timetable-data')
-      if (saved) {
-        const data = JSON.parse(saved)
-        setSubjects(data.subjects || [])
-        setClasses(data.classes || [])
-        setTeachers(data.teachers || [])
+      if (!saved) return
+
+      const data = JSON.parse(saved)
+      const loadedSubjects = data.subjects || []
+      let catalog = data.subjectCatalog || []
+
+      if (catalog.length === 0 && loadedSubjects.length > 0) {
+        catalog = buildCatalogFromSubjects(loadedSubjects)
       }
+
+      setSubjectCatalog(catalog)
+      setSubjects(attachCatalogIds(loadedSubjects, catalog))
+      setClasses(data.classes || [])
+      setTeachers(data.teachers || [])
     } catch {}
   }, [])
 
-  // Save to localStorage
-  const saveData = useCallback((subj, cls, teach) => {
-    localStorage.setItem('timetable-data', JSON.stringify({ subjects: subj, classes: cls, teachers: teach }))
+  const saveData = useCallback((catalog, subj, cls, teach) => {
+    localStorage.setItem(
+      'timetable-data',
+      JSON.stringify({
+        subjectCatalog: catalog,
+        subjects: subj,
+        classes: cls,
+        teachers: teach,
+      }),
+    )
   }, [])
 
   const handleGenerate = useCallback(() => {
     setError('')
-    if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) {
-      setError('Please add at least one subject, class, and teacher before generating.')
+    if (subjectCatalog.length === 0 || classes.length === 0 || teachers.length === 0) {
+      setError('Please import or add subjects, classes, and teachers before generating.')
+      return
+    }
+    if (subjects.length === 0) {
+      setError('Add at least one subject assignment (class + teacher) on the Subjects tab.')
+      return
+    }
+    const incomplete = subjects.filter((s) => !s.classId || !s.teacherId)
+    if (incomplete.length > 0) {
+      setError('Complete all subject assignments with a class and teacher before generating.')
+      setActiveTab('subjects')
       return
     }
     try {
@@ -51,10 +97,11 @@ export default function App() {
     } catch (e) {
       setError(e.message)
     }
-  }, [subjects, classes, teachers])
+  }, [subjectCatalog, subjects, classes, teachers])
 
   const handleReset = useCallback(() => {
     if (confirm('Delete all data? This cannot be undone.')) {
+      setSubjectCatalog([])
       setSubjects([])
       setClasses([])
       setTeachers([])
@@ -64,15 +111,19 @@ export default function App() {
     }
   }, [])
 
-  const handleExcelImport = useCallback(({ subjects: subj, classes: cls, teachers: teach }) => {
-    setSubjects(subj)
-    setClasses(cls)
-    setTeachers(teach)
-    setTimetable(null)
-    setError('')
-    saveData(subj, cls, teach)
-    setActiveTab('subjects')
-  }, [saveData])
+  const handleExcelImport = useCallback(
+    ({ subjectCatalog: catalog, subjects: subj, classes: cls, teachers: teach }) => {
+      setSubjectCatalog(catalog)
+      setSubjects(subj)
+      setClasses(cls)
+      setTeachers(teach)
+      setTimetable(null)
+      setError('')
+      saveData(catalog, subj, cls, teach)
+      setActiveTab('subjects')
+    },
+    [saveData],
+  )
 
   return (
     <div className="app">
@@ -99,23 +150,38 @@ export default function App() {
           <ExcelImportExport
             classes={classes}
             teachers={teachers}
-            subjects={subjects}
+            subjectCatalog={subjectCatalog}
             onImport={handleExcelImport}
             onError={setError}
           />
           {activeTab === 'subjects' && (
             <SubjectForm
+              subjectCatalog={subjectCatalog}
+              onCatalogChange={(catalog) => {
+                setSubjectCatalog(catalog)
+                saveData(catalog, subjects, classes, teachers)
+              }}
               subjects={subjects}
               teachers={teachers}
               classes={classes}
-              onChange={(s) => { setSubjects(s); saveData(s, classes, teachers) }}
+              onChange={(s) => {
+                setSubjects(s)
+                saveData(subjectCatalog, s, classes, teachers)
+              }}
+              onTeachersChange={(t) => {
+                setTeachers(t)
+                saveData(subjectCatalog, subjects, classes, t)
+              }}
             />
           )}
           {activeTab === 'classes' && (
             <ClassForm
               classes={classes}
               subjects={subjects}
-              onChange={(c) => { setClasses(c); saveData(subjects, c, teachers) }}
+              onChange={(c) => {
+                setClasses(c)
+                saveData(subjectCatalog, subjects, c, teachers)
+              }}
             />
           )}
           {activeTab === 'teachers' && (
@@ -123,7 +189,10 @@ export default function App() {
               teachers={teachers}
               subjects={subjects}
               classes={classes}
-              onChange={(t) => { setTeachers(t); saveData(subjects, classes, t) }}
+              onChange={(t) => {
+                setTeachers(t)
+                saveData(subjectCatalog, subjects, classes, t)
+              }}
             />
           )}
           {activeTab === 'timetable' && (

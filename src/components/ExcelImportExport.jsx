@@ -9,7 +9,7 @@ import {
 export default function ExcelImportExport({
   classes,
   teachers,
-  subjects,
+  subjectCatalog,
   onImport,
   onError,
 }) {
@@ -17,7 +17,8 @@ export default function ExcelImportExport({
   const [status, setStatus] = useState(null)
   const [warnings, setWarnings] = useState([])
 
-  const hasData = classes.length > 0 || teachers.length > 0 || subjects.length > 0
+  const hasData =
+    classes.length > 0 || teachers.length > 0 || subjectCatalog.length > 0
 
   const handleDownloadTemplate = () => {
     downloadTemplate()
@@ -25,8 +26,8 @@ export default function ExcelImportExport({
   }
 
   const handleDownloadData = () => {
-    downloadCurrentData(classes, teachers, subjects)
-    setStatus({ type: 'success', message: 'Current data exported to Excel.' })
+    downloadCurrentData(classes, teachers, subjectCatalog)
+    setStatus({ type: 'success', message: 'Lists exported to Excel. Assignments stay in the app.' })
   }
 
   const handleFileChange = async (event) => {
@@ -45,7 +46,7 @@ export default function ExcelImportExport({
 
     if (hasData) {
       const replace = confirm(
-        'Importing will replace all current classes, teachers, and subjects. Continue?',
+        'Importing will replace your class, teacher, and subject lists. Existing assignments will be cleared. Continue?',
       )
       if (!replace) return
     }
@@ -63,18 +64,22 @@ export default function ExcelImportExport({
       }
 
       onImport({
+        subjectCatalog: result.subjectCatalog,
+        subjects: result.subjects,
         classes: result.classes,
         teachers: result.teachers,
-        subjects: result.subjects,
       })
 
       setWarnings(result.warnings)
       setStatus({
         type: 'success',
-        message: `Imported ${result.classes.length} classes, ${result.teachers.length} teachers, and ${result.subjects.length} subjects.`,
+        message: `Imported ${result.classes.length} classes, ${result.teachers.length} teachers, and ${result.subjectCatalog.length} subjects. Assign them on the Subjects tab.`,
       })
     } catch {
-      setStatus({ type: 'error', message: 'Could not read the Excel file. Check the format and try again.' })
+      setStatus({
+        type: 'error',
+        message: 'Could not read the Excel file. Check the format and try again.',
+      })
     }
   }
 
@@ -82,8 +87,8 @@ export default function ExcelImportExport({
     <div className="form-container excel-panel">
       <h2>Excel import / export</h2>
       <p className="form-help">
-        Download our template, fill in the Classes, Teachers, and Subjects sheets, then upload
-        to prefill everything at once.
+        Download the template and fill in three separate lists: classes, teachers, and subject names.
+        After upload, go to the Subjects tab to assign each subject to a class and teacher.
       </p>
 
       <div className="excel-actions">
@@ -95,9 +100,9 @@ export default function ExcelImportExport({
           className="btn-secondary"
           onClick={handleDownloadData}
           disabled={!hasData}
-          title={hasData ? 'Export current data to Excel' : 'Add data first to export'}
+          title={hasData ? 'Export lists to Excel' : 'Add data first to export'}
         >
-          Export current data
+          Export lists
         </button>
         <button
           type="button"

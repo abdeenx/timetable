@@ -8,13 +8,8 @@ const SHEET = {
 }
 
 const CLASS_HEADERS = ['Class Name', 'Grade/Year']
-const TEACHER_HEADERS = [
-  'Teacher Name',
-  'Max Hours/Week',
-  'Subject Names (comma-separated)',
-  'Class Names (comma-separated)',
-]
-const SUBJECT_HEADERS = ['Subject Name', 'Class Name', 'Teacher Name', 'Hours/Week']
+const TEACHER_HEADERS = ['Teacher Name', 'Max Hours/Week']
+const SUBJECT_HEADERS = ['Subject Name']
 
 const TEMPLATE_CLASSES = [
   { 'Class Name': 'Grade 10A', 'Grade/Year': 'Grade 10' },
@@ -22,45 +17,21 @@ const TEMPLATE_CLASSES = [
 ]
 
 const TEMPLATE_TEACHERS = [
-  {
-    'Teacher Name': 'Jane Smith',
-    'Max Hours/Week': 30,
-    'Subject Names (comma-separated)': 'Mathematics, Physics',
-    'Class Names (comma-separated)': 'Grade 10A, Grade 10B',
-  },
-  {
-    'Teacher Name': 'John Doe',
-    'Max Hours/Week': 25,
-    'Subject Names (comma-separated)': 'English',
-    'Class Names (comma-separated)': 'Grade 10A',
-  },
+  { 'Teacher Name': 'Jane Smith', 'Max Hours/Week': 30 },
+  { 'Teacher Name': 'John Doe', 'Max Hours/Week': 25 },
 ]
 
 const TEMPLATE_SUBJECTS = [
-  {
-    'Subject Name': 'Mathematics',
-    'Class Name': 'Grade 10A',
-    'Teacher Name': 'Jane Smith',
-    'Hours/Week': 5,
-  },
-  {
-    'Subject Name': 'English',
-    'Class Name': 'Grade 10A',
-    'Teacher Name': 'John Doe',
-    'Hours/Week': 4,
-  },
-  {
-    'Subject Name': 'Physics',
-    'Class Name': 'Grade 10B',
-    'Teacher Name': 'Jane Smith',
-    'Hours/Week': 3,
-  },
+  { 'Subject Name': 'Mathematics' },
+  { 'Subject Name': 'English' },
+  { 'Subject Name': 'Physics' },
 ]
 
 const INSTRUCTIONS = [
   ['School Timetable Generator — Excel Import Guide'],
   [],
-  ['Fill in the Classes, Teachers, and Subjects sheets, then upload the file in the app.'],
+  ['Each sheet is a simple list. Do not repeat names across sheets.'],
+  ['After import, use the Subjects tab in the app to assign each subject to a class and teacher.'],
   [],
   ['Classes sheet'],
   ['  • Class Name — required (e.g. Grade 10A)'],
@@ -68,20 +39,15 @@ const INSTRUCTIONS = [
   [],
   ['Teachers sheet'],
   ['  • Teacher Name — required'],
-  ['  • Max Hours/Week — required number (default 30)'],
-  ['  • Subject Names — optional; comma-separated subject names this teacher can teach'],
-  ['  • Class Names — optional; comma-separated class names this teacher can teach'],
+  ['  • Max Hours/Week — required number (defaults to 30 if empty)'],
   [],
   ['Subjects sheet'],
-  ['  • Subject Name — required'],
-  ['  • Class Name — must match a row in Classes'],
-  ['  • Teacher Name — must match a row in Teachers'],
-  ['  • Hours/Week — required positive number'],
+  ['  • Subject Name — required (e.g. Mathematics, English)'],
+  ['  • One row per subject name; no class or teacher columns needed'],
   [],
   ['Tips'],
   ['  • Keep sheet names unchanged (Classes, Teachers, Subjects).'],
-  ['  • Names are matched case-insensitively.'],
-  ['  • Download "Export current data" to edit existing entries in Excel.'],
+  ['  • Assign subjects to classes and teachers in the web app after upload.'],
 ]
 
 let idCounter = 0
@@ -96,13 +62,6 @@ function normalize(value) {
 
 function normalizeKey(value) {
   return normalize(value).toLowerCase()
-}
-
-function splitList(value) {
-  return normalize(value)
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
 }
 
 function sheetRows(workbook, name) {
@@ -122,7 +81,12 @@ function getCell(row, ...keys) {
   return ''
 }
 
-function buildWorkbook({ classes = TEMPLATE_CLASSES, teachers = TEMPLATE_TEACHERS, subjects = TEMPLATE_SUBJECTS, includeInstructions = true } = {}) {
+function buildWorkbook({
+  classes = TEMPLATE_CLASSES,
+  teachers = TEMPLATE_TEACHERS,
+  subjectCatalog = TEMPLATE_SUBJECTS,
+  includeInstructions = true,
+} = {}) {
   const wb = XLSX.utils.book_new()
 
   if (includeInstructions) {
@@ -141,7 +105,7 @@ function buildWorkbook({ classes = TEMPLATE_CLASSES, teachers = TEMPLATE_TEACHER
   )
   XLSX.utils.book_append_sheet(
     wb,
-    XLSX.utils.json_to_sheet(subjects, { header: SUBJECT_HEADERS }),
+    XLSX.utils.json_to_sheet(subjectCatalog, { header: SUBJECT_HEADERS }),
     SHEET.SUBJECTS,
   )
 
@@ -150,45 +114,28 @@ function buildWorkbook({ classes = TEMPLATE_CLASSES, teachers = TEMPLATE_TEACHER
 
 export function downloadTemplate() {
   idCounter = 0
-  const wb = buildWorkbook()
-  XLSX.writeFile(wb, 'timetable-template.xlsx')
+  XLSX.writeFile(buildWorkbook(), 'timetable-template.xlsx')
 }
 
-export function downloadCurrentData(classes, teachers, subjects) {
+export function downloadCurrentData(classes, teachers, subjectCatalog) {
   const classRows = classes.map((c) => ({
     'Class Name': c.name,
     'Grade/Year': c.grade || c.name,
   }))
 
-  const teacherRows = teachers.map((t) => {
-    const subjectNames = [
-      ...new Set(
-        subjects.filter((s) => t.subjectIds?.includes(s.id)).map((s) => s.name),
-      ),
-    ]
-    const classNames = classes
-      .filter((c) => t.classIds?.includes(c.id))
-      .map((c) => c.name)
+  const teacherRows = teachers.map((t) => ({
+    'Teacher Name': t.name,
+    'Max Hours/Week': t.maxHoursPerWeek,
+  }))
 
-    return {
-      'Teacher Name': t.name,
-      'Max Hours/Week': t.maxHoursPerWeek,
-      'Subject Names (comma-separated)': subjectNames.join(', '),
-      'Class Names (comma-separated)': classNames.join(', '),
-    }
-  })
-
-  const subjectRows = subjects.map((s) => ({
+  const subjectRows = subjectCatalog.map((s) => ({
     'Subject Name': s.name,
-    'Class Name': classes.find((c) => c.id === s.classId)?.name || '',
-    'Teacher Name': teachers.find((t) => t.id === s.teacherId)?.name || '',
-    'Hours/Week': s.hoursPerWeek,
   }))
 
   const wb = buildWorkbook({
     classes: classRows.length ? classRows : TEMPLATE_CLASSES,
     teachers: teacherRows.length ? teacherRows : TEMPLATE_TEACHERS,
-    subjects: subjectRows.length ? subjectRows : TEMPLATE_SUBJECTS,
+    subjectCatalog: subjectRows.length ? subjectRows : TEMPLATE_SUBJECTS,
     includeInstructions: true,
   })
 
@@ -209,10 +156,11 @@ export function parseExcelFile(arrayBuffer) {
   if (!classRows) errors.push('Missing "Classes" sheet.')
   if (!teacherRows) errors.push('Missing "Teachers" sheet.')
   if (!subjectRows) errors.push('Missing "Subjects" sheet.')
-  if (errors.length) return { errors, warnings, classes: [], teachers: [], subjects: [] }
+  if (errors.length) {
+    return { errors, warnings, classes: [], teachers: [], subjectCatalog: [], subjects: [] }
+  }
 
   const classes = []
-  const classIdByName = new Map()
   const seenClassNames = new Set()
 
   classRows.forEach((row, index) => {
@@ -228,15 +176,11 @@ export function parseExcelFile(arrayBuffer) {
 
     seenClassNames.add(key)
     const grade = normalize(getCell(row, 'Grade/Year', 'Grade', 'Year')) || name
-    const id = newId()
-    classes.push({ id, name, grade })
-    classIdByName.set(key, id)
+    classes.push({ id: newId(), name, grade })
   })
 
   const teachers = []
-  const teacherIdByName = new Map()
   const seenTeacherNames = new Set()
-  const teacherMeta = []
 
   teacherRows.forEach((row, index) => {
     const rowNum = index + 2
@@ -251,128 +195,61 @@ export function parseExcelFile(arrayBuffer) {
 
     seenTeacherNames.add(key)
     const maxRaw = getCell(row, 'Max Hours/Week', 'Max Hours', 'Max Hrs/Week')
-    const maxHours = parseInt(maxRaw, 10)
+    const maxHours = maxRaw === '' ? 30 : parseInt(maxRaw, 10)
     if (Number.isNaN(maxHours) || maxHours < 1) {
       errors.push(`Teachers row ${rowNum}: invalid max hours for "${name}".`)
       return
     }
 
-    const id = newId()
     teachers.push({
-      id,
+      id: newId(),
       name,
       maxHoursPerWeek: maxHours,
       subjectIds: [],
       classIds: [],
     })
-    teacherIdByName.set(key, id)
-    teacherMeta.push({
-      id,
-      subjectNames: splitList(
-        getCell(row, 'Subject Names (comma-separated)', 'Subject Names', 'Subjects'),
-      ),
-      classNames: splitList(
-        getCell(row, 'Class Names (comma-separated)', 'Class Names', 'Classes'),
-      ),
-    })
   })
 
-  const subjects = []
+  const subjectCatalog = []
+  const seenSubjectNames = new Set()
 
   subjectRows.forEach((row, index) => {
     const rowNum = index + 2
     const name = normalize(getCell(row, 'Subject Name', 'Subject'))
     if (!name) return
 
-    const className = normalize(getCell(row, 'Class Name', 'Class'))
-    const teacherName = normalize(getCell(row, 'Teacher Name', 'Teacher'))
-    const hoursRaw = getCell(row, 'Hours/Week', 'Hours Per Week', 'Hours')
-    const hours = parseInt(hoursRaw, 10)
-
-    if (!className) {
-      errors.push(`Subjects row ${rowNum}: missing class for "${name}".`)
-      return
-    }
-    if (!teacherName) {
-      errors.push(`Subjects row ${rowNum}: missing teacher for "${name}".`)
-      return
-    }
-    if (Number.isNaN(hours) || hours < 1) {
-      errors.push(`Subjects row ${rowNum}: invalid hours for "${name}".`)
+    const key = normalizeKey(name)
+    if (seenSubjectNames.has(key)) {
+      warnings.push(`Subjects row ${rowNum}: duplicate "${name}" skipped.`)
       return
     }
 
-    const classId = classIdByName.get(normalizeKey(className))
-    if (!classId) {
-      errors.push(`Subjects row ${rowNum}: unknown class "${className}" for "${name}".`)
-      return
-    }
-
-    const teacherId = teacherIdByName.get(normalizeKey(teacherName))
-    if (!teacherId) {
-      errors.push(`Subjects row ${rowNum}: unknown teacher "${teacherName}" for "${name}".`)
-      return
-    }
-
-    subjects.push({
-      id: newId(),
-      name,
-      hoursPerWeek: hours,
-      classId,
-      teacherId,
-    })
+    seenSubjectNames.add(key)
+    subjectCatalog.push({ id: newId(), name })
   })
 
-  if (classes.length === 0) errors.push('No classes found. Add at least one row to the Classes sheet.')
-  if (teachers.length === 0) errors.push('No teachers found. Add at least one row to the Teachers sheet.')
-  if (subjects.length === 0) errors.push('No subjects found. Add at least one row to the Subjects sheet.')
+  if (classes.length === 0) {
+    errors.push('No classes found. Add at least one row to the Classes sheet.')
+  }
+  if (teachers.length === 0) {
+    errors.push('No teachers found. Add at least one row to the Teachers sheet.')
+  }
+  if (subjectCatalog.length === 0) {
+    errors.push('No subjects found. Add at least one row to the Subjects sheet.')
+  }
 
   if (errors.length) {
-    return { errors, warnings, classes: [], teachers: [], subjects: [] }
+    return { errors, warnings, classes: [], teachers: [], subjectCatalog: [], subjects: [] }
   }
 
-  for (const meta of teacherMeta) {
-    const teacher = teachers.find((t) => t.id === meta.id)
-    if (!teacher) continue
-
-    for (const subjectName of meta.subjectNames) {
-      const matches = subjects.filter((s) => normalizeKey(s.name) === normalizeKey(subjectName))
-      if (matches.length === 0) {
-        warnings.push(`Teacher "${teacher.name}": subject "${subjectName}" not found in Subjects sheet.`)
-        continue
-      }
-      for (const subject of matches) {
-        if (!teacher.subjectIds.includes(subject.id)) {
-          teacher.subjectIds.push(subject.id)
-        }
-      }
-    }
-
-    for (const className of meta.classNames) {
-      const classId = classIdByName.get(normalizeKey(className))
-      if (!classId) {
-        warnings.push(`Teacher "${teacher.name}": class "${className}" not found in Classes sheet.`)
-        continue
-      }
-      if (!teacher.classIds.includes(classId)) {
-        teacher.classIds.push(classId)
-      }
-    }
+  return {
+    errors,
+    warnings,
+    classes,
+    teachers,
+    subjectCatalog,
+    subjects: [],
   }
-
-  for (const teacher of teachers) {
-    const assignedSubjects = subjects.filter((s) => s.teacherId === teacher.id)
-    for (const subject of assignedSubjects) {
-      if (!teacher.subjectIds.includes(subject.id)) {
-        teacher.subjectIds.push(subject.id)
-      }
-      if (!teacher.classIds.includes(subject.classId)) {
-        teacher.classIds.push(subject.classId)
-      }
-    }
-  }
-
-  return { errors, warnings, classes, teachers, subjects }
 }
 
 export async function readFileAsArrayBuffer(file) {
