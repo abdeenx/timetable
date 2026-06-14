@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { classCompositeKey, formatClassLabel } from './classes'
 
 const SHEET = {
   INSTRUCTIONS: 'Instructions',
@@ -12,8 +13,9 @@ const TEACHER_HEADERS = ['Teacher Name', 'Max Hours/Week']
 const SUBJECT_HEADERS = ['Subject Name']
 
 const TEMPLATE_CLASSES = [
-  { 'Class Name': 'Grade 10A', 'Grade/Year': 'Grade 10' },
-  { 'Class Name': 'Grade 10B', 'Grade/Year': 'Grade 10' },
+  { 'Class Name': 'A', 'Grade/Year': 'Grade 10' },
+  { 'Class Name': 'B', 'Grade/Year': 'Grade 10' },
+  { 'Class Name': 'A', 'Grade/Year': 'Grade 11' },
 ]
 
 const TEMPLATE_TEACHERS = [
@@ -34,8 +36,8 @@ const INSTRUCTIONS = [
   ['After import, use the Subjects tab in the app to assign each subject to a class and teacher.'],
   [],
   ['Classes sheet'],
-  ['  • Class Name — required (e.g. Grade 10A)'],
-  ['  • Grade/Year — optional; defaults to class name if empty'],
+  ['  • Class Name — required (e.g. A, 10A, Science)'],
+  ['  • Grade/Year — required for grouping (e.g. Grade 10); same class name can repeat across grades'],
   [],
   ['Teachers sheet'],
   ['  • Teacher Name — required'],
@@ -161,21 +163,21 @@ export function parseExcelFile(arrayBuffer) {
   }
 
   const classes = []
-  const seenClassNames = new Set()
+  const seenClasses = new Set()
 
   classRows.forEach((row, index) => {
     const rowNum = index + 2
     const name = normalize(getCell(row, 'Class Name', 'Class'))
     if (!name) return
 
-    const key = normalizeKey(name)
-    if (seenClassNames.has(key)) {
-      warnings.push(`Classes row ${rowNum}: duplicate "${name}" skipped.`)
+    const grade = normalize(getCell(row, 'Grade/Year', 'Grade', 'Year')) || name
+    const key = classCompositeKey({ name, grade })
+    if (seenClasses.has(key)) {
+      warnings.push(`Classes row ${rowNum}: duplicate "${formatClassLabel({ name, grade })}" skipped.`)
       return
     }
 
-    seenClassNames.add(key)
-    const grade = normalize(getCell(row, 'Grade/Year', 'Grade', 'Year')) || name
+    seenClasses.add(key)
     classes.push({ id: newId(), name, grade })
   })
 

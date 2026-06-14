@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatClassLabel } from '../utils/classes'
 
 function syncTeacherLinks(teachers, subjects) {
   return teachers.map((teacher) => {
@@ -170,7 +171,7 @@ export default function SubjectForm({
             <option value="">Select class...</option>
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {formatClassLabel(c)}
               </option>
             ))}
           </select>
@@ -204,7 +205,7 @@ export default function SubjectForm({
 
         {classId && selectedClass && (
           <div className="class-summary">
-            <strong>{selectedClass.name}</strong>:{' '}
+            <strong>{formatClassLabel(selectedClass)}</strong>:{' '}
             {classSubjects.reduce((sum, s) => sum + s.hoursPerWeek, 0)} hrs/week assigned
             {classSubjects.length > 0 && ` (${classSubjects.map((s) => s.name).join(', ')})`}
           </div>
@@ -246,7 +247,7 @@ export default function SubjectForm({
                     <option value="">Select...</option>
                     {classes.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {formatClassLabel(c)}
                       </option>
                     ))}
                   </select>

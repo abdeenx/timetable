@@ -9,16 +9,18 @@
  * 5. Subjects are reasonably distributed across the week (not all on one day)
  */
 
+import { formatClassLabel } from './classes'
+
 export function generateTimetable(subjects, classes, teachers, days, periodsPerDay) {
   const schedule = {}
-  const teacherLoad = {}   // teacherId -> current assigned hours
+  const teacherLoad = {}
   const warnings = []
 
-  // Initialize schedule for each class
   for (const cls of classes) {
-    schedule[cls.name] = {}
+    const label = formatClassLabel(cls)
+    schedule[label] = {}
     for (const day of days) {
-      schedule[cls.name][day] = new Array(periodsPerDay).fill(null)
+      schedule[label][day] = new Array(periodsPerDay).fill(null)
     }
   }
 
@@ -27,8 +29,8 @@ export function generateTimetable(subjects, classes, teachers, days, periodsPerD
     teacherLoad[t.id] = 0
   }
 
-  // For each class, schedule its subjects
   for (const cls of classes) {
+    const label = formatClassLabel(cls)
     const classSubjects = subjects.filter(s => s.classId === cls.id)
     if (classSubjects.length === 0) continue
 
@@ -44,7 +46,7 @@ export function generateTimetable(subjects, classes, teachers, days, periodsPerD
     const totalNeeded = subjectSlots.reduce((sum, s) => sum + s.remaining, 0)
     if (totalNeeded > totalSlots) {
       warnings.push(
-        `${cls.name}: ${totalNeeded} hours needed but only ${totalSlots} slots available (${days.length} days × ${periodsPerDay} periods). Reduce subject hours.`
+        `${label}: ${totalNeeded} hours needed but only ${totalSlots} slots available (${days.length} days × ${periodsPerDay} periods). Reduce subject hours.`
       )
     }
 
@@ -64,7 +66,7 @@ export function generateTimetable(subjects, classes, teachers, days, periodsPerD
     // Assign subjects to slots
     for (const slot of allSlots) {
       if (subjectSlots.every(s => s.remaining === 0)) break
-      if (schedule[cls.name][slot.day][slot.period] !== null) continue
+      if (schedule[label][slot.day][slot.period] !== null) continue
 
       // Pick a subject that still needs slots, prioritizing higher remaining counts
       const available = subjectSlots
@@ -91,7 +93,7 @@ export function generateTimetable(subjects, classes, teachers, days, periodsPerD
         }
 
         if (!teacherBusy) {
-          schedule[cls.name][slot.day][slot.period] = {
+          schedule[label][slot.day][slot.period] = {
             subject: subj.name,
             teacher: teacher?.name || 'Unassigned',
             teacherId: teacher?.id || null,
@@ -107,7 +109,7 @@ export function generateTimetable(subjects, classes, teachers, days, periodsPerD
     for (const subj of subjectSlots) {
       if (subj.remaining > 0) {
         warnings.push(
-          `${cls.name} - ${subj.name}: could only schedule ${subj.hoursPerWeek - subj.remaining}/${subj.hoursPerWeek} hours. Check teacher availability or add more slots.`
+          `${label} - ${subj.name}: could only schedule ${subj.hoursPerWeek - subj.remaining}/${subj.hoursPerWeek} hours. Check teacher availability or add more slots.`
         )
       }
     }

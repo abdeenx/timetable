@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatClassLabel, isDuplicateClass } from '../utils/classes'
 
 export default function ClassForm({ classes, subjects, onChange }) {
   const [name, setName] = useState('')
@@ -6,10 +7,13 @@ export default function ClassForm({ classes, subjects, onChange }) {
 
   const addClass = () => {
     if (!name.trim()) return
+    const trimmedName = name.trim()
+    const trimmedGrade = grade.trim() || trimmedName
+    if (isDuplicateClass(classes, trimmedName, trimmedGrade)) return
     onChange([...classes, {
       id: Date.now().toString(),
-      name: name.trim(),
-      grade: grade.trim() || name.trim(),
+      name: trimmedName,
+      grade: trimmedGrade,
     }])
     setName('')
     setGrade('')
@@ -22,12 +26,14 @@ export default function ClassForm({ classes, subjects, onChange }) {
   return (
     <div className="form-container">
       <h2>Classes</h2>
-      <p className="form-help">Add classes (e.g. "Grade 10A", "Form 3 Science"). Each class has subjects assigned to it.</p>
+      <p className="form-help">
+        Add classes with a short name (e.g. A, B) and a grade/year. The same class name can be used in different grades.
+      </p>
       
       <div className="form-row">
         <input
           type="text"
-          placeholder="Class name (e.g. Grade 10A)"
+          placeholder="Class name (e.g. A, 10A)"
           value={name}
           onChange={e => setName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addClass()}
@@ -45,6 +51,7 @@ export default function ClassForm({ classes, subjects, onChange }) {
       <table className="data-table">
         <thead>
           <tr>
+            <th>Display name</th>
             <th>Class</th>
             <th>Grade/Year</th>
             <th>Subjects</th>
@@ -58,6 +65,7 @@ export default function ClassForm({ classes, subjects, onChange }) {
             const totalHrs = classSubjects.reduce((sum, s) => sum + s.hoursPerWeek, 0)
             return (
               <tr key={c.id}>
+                <td>{formatClassLabel(c)}</td>
                 <td>{c.name}</td>
                 <td>{c.grade}</td>
                 <td>{classSubjects.map(s => s.name).join(', ') || '—'}</td>
@@ -67,7 +75,7 @@ export default function ClassForm({ classes, subjects, onChange }) {
             )
           })}
           {classes.length === 0 && (
-            <tr><td colSpan="5" className="empty">No classes added yet.</td></tr>
+            <tr><td colSpan="6" className="empty">No classes added yet.</td></tr>
           )}
         </tbody>
       </table>

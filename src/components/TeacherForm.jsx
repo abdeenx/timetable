@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatClassLabel } from '../utils/classes'
 
 export default function TeacherForm({ teachers, subjects, classes, onChange }) {
   const [name, setName] = useState('')
@@ -87,7 +88,7 @@ export default function TeacherForm({ teachers, subjects, classes, onChange }) {
                   checked={selectedClasses.includes(c.id)}
                   onChange={() => toggleClass(c.id)}
                 />
-                {c.name}
+                {formatClassLabel(c)}
               </label>
             ))}
           </div>
@@ -112,7 +113,7 @@ export default function TeacherForm({ teachers, subjects, classes, onChange }) {
               <tr key={t.id}>
                 <td>{t.name}</td>
                 <td>{teacherSubjects.map(s => s.name).join(', ') || '—'}</td>
-                <td>{teacherClasses.map(c => c.name).join(', ') || '—'}</td>
+                <td>{teacherClasses.map(c => formatClassLabel(c)).join(', ') || '—'}</td>
                 <td>{t.maxHoursPerWeek}</td>
                 <td><button className="btn-danger" onClick={() => removeTeacher(t.id)}>×</button></td>
               </tr>
