@@ -86,6 +86,46 @@ body {
 .sidebar-icon { font-size: 20px; }
 .sidebar-label { font-size: 9px; white-space: nowrap; }
 
+/* Excel import / export */
+.excel-panel { margin-bottom: 20px; }
+.excel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.excel-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+.excel-status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.excel-status-success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+.excel-status-error {
+  background: #fef2f2;
+  color: var(--danger);
+  border: 1px solid #fecaca;
+}
+.excel-warnings { margin-top: 12px; margin-bottom: 0; }
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Main */
 .main {
   margin-left: 72px;
@@ -435,6 +475,14 @@ body {
     width: 100%;
     padding: 12px 10px;
     font-size: 13px;
+  }
+  .excel-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .excel-actions .btn-primary,
+  .excel-actions .btn-secondary {
+    width: 100%;
   }
   .content { padding: 12px; }
   .form-container { padding: 16px; }

@@ -5,6 +5,7 @@ import TeacherForm from './components/TeacherForm'
 import TimetableView from './components/TimetableView'
 import Sidebar from './components/Sidebar'
 import InstallPrompt from './components/InstallPrompt'
+import ExcelImportExport from './components/ExcelImportExport'
 import { generateTimetable } from './utils/generator'
 import './App.css'
 
@@ -63,6 +64,16 @@ export default function App() {
     }
   }, [])
 
+  const handleExcelImport = useCallback(({ subjects: subj, classes: cls, teachers: teach }) => {
+    setSubjects(subj)
+    setClasses(cls)
+    setTeachers(teach)
+    setTimetable(null)
+    setError('')
+    saveData(subj, cls, teach)
+    setActiveTab('subjects')
+  }, [saveData])
+
   return (
     <div className="app">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -85,6 +96,13 @@ export default function App() {
         {error && <div className="error-banner">{error}</div>}
 
         <div className="content">
+          <ExcelImportExport
+            classes={classes}
+            teachers={teachers}
+            subjects={subjects}
+            onImport={handleExcelImport}
+            onError={setError}
+          />
           {activeTab === 'subjects' && (
             <SubjectForm
               subjects={subjects}
