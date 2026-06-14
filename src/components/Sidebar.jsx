@@ -8,7 +8,9 @@ export default function Sidebar({ activeTab, onTabChange }) {
 
   return (
     <nav className="sidebar">
-      <div className="sidebar-logo">⏰</div>
+      <div className="sidebar-logo">
+        <img src="/logo.png" alt="School Timetable Generator" width={44} height={44} />
+      </div>
       {tabs.map(tab => (
         <button
           key={tab.id}

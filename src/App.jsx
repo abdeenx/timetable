@@ -4,6 +4,7 @@ import ClassForm from './components/ClassForm'
 import TeacherForm from './components/TeacherForm'
 import TimetableView from './components/TimetableView'
 import Sidebar from './components/Sidebar'
+import InstallPrompt from './components/InstallPrompt'
 import { generateTimetable } from './utils/generator'
 import './App.css'
 
@@ -67,7 +68,10 @@ export default function App() {
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="main">
         <header className="header">
-          <h1>School Timetable Generator</h1>
+          <div className="header-brand">
+            <img src="/logo.png" alt="" className="header-logo" width={40} height={40} />
+            <h1>School Timetable Generator</h1>
+          </div>
           <div className="header-actions">
             <button className="btn-primary" onClick={handleGenerate}>
               Generate Timetable
@@ -109,6 +113,7 @@ export default function App() {
           )}
         </div>
       </main>
+      <InstallPrompt />
     </div>
   )
 }
