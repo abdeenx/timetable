@@ -7,6 +7,7 @@ import Sidebar from './components/Sidebar'
 import InstallPrompt from './components/InstallPrompt'
 import ExcelImportExport from './components/ExcelImportExport'
 import { generateTimetable } from './utils/generator'
+import { migrateLegacySubjects, syncTeacherLinks } from './utils/subjects'
 import './App.css'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
@@ -25,18 +26,11 @@ function buildCatalogFromSubjects(subjects) {
   return [...seen.values()]
 }
 
-function attachCatalogIds(subjects, catalog) {
-  const byName = new Map(catalog.map((entry) => [entry.name.toLowerCase(), entry.id]))
-  return subjects.map((subject) => ({
-    ...subject,
-    catalogId: subject.catalogId || byName.get(subject.name?.toLowerCase()) || null,
-  }))
-}
-
 export default function App() {
   const [activeTab, setActiveTab] = useState('subjects')
   const [subjectCatalog, setSubjectCatalog] = useState([])
-  const [subjects, setSubjects] = useState([])
+  const [classSubjects, setClassSubjects] = useState([])
+  const [assignments, setAssignments] = useState([])
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
   const [timetable, setTimetable] = useState(null)
@@ -48,26 +42,43 @@ export default function App() {
       if (!saved) return
 
       const data = JSON.parse(saved)
-      const loadedSubjects = data.subjects || []
       let catalog = data.subjectCatalog || []
+      let loadedClassSubjects = data.classSubjects || []
+      let loadedAssignments = data.assignments || []
 
-      if (catalog.length === 0 && loadedSubjects.length > 0) {
-        catalog = buildCatalogFromSubjects(loadedSubjects)
+      if (loadedClassSubjects.length === 0 && (data.subjects?.length || 0) > 0) {
+        const migrated = migrateLegacySubjects(data.subjects)
+        loadedClassSubjects = migrated.classSubjects
+        loadedAssignments = migrated.assignments
       }
 
+      if (catalog.length === 0 && loadedClassSubjects.length > 0) {
+        catalog = buildCatalogFromSubjects(loadedClassSubjects)
+      } else if (catalog.length === 0 && (data.subjects?.length || 0) > 0) {
+        catalog = buildCatalogFromSubjects(data.subjects)
+      }
+
+      const syncedTeachers = syncTeacherLinks(
+        data.teachers || [],
+        loadedClassSubjects,
+        loadedAssignments,
+      )
+
       setSubjectCatalog(catalog)
-      setSubjects(attachCatalogIds(loadedSubjects, catalog))
+      setClassSubjects(loadedClassSubjects)
+      setAssignments(loadedAssignments)
       setClasses(data.classes || [])
-      setTeachers(data.teachers || [])
+      setTeachers(syncedTeachers)
     } catch {}
   }, [])
 
-  const saveData = useCallback((catalog, subj, cls, teach) => {
+  const saveData = useCallback((catalog, classSubs, assign, cls, teach) => {
     localStorage.setItem(
       'timetable-data',
       JSON.stringify({
         subjectCatalog: catalog,
-        subjects: subj,
+        classSubjects: classSubs,
+        assignments: assign,
         classes: cls,
         teachers: teach,
       }),
@@ -80,29 +91,39 @@ export default function App() {
       setError('Please import or add subjects, classes, and teachers before generating.')
       return
     }
-    if (subjects.length === 0) {
-      setError('Add at least one subject assignment (class + teacher) on the Subjects tab.')
+    if (classSubjects.length === 0) {
+      setError('Add at least one subject-class with weekly hours on the Subjects tab.')
       return
     }
-    const incomplete = subjects.filter((s) => !s.classId || !s.teacherId)
-    if (incomplete.length > 0) {
-      setError('Complete all subject assignments with a class and teacher before generating.')
+    const unassigned = classSubjects.filter(
+      (cs) => !assignments.some((a) => a.classSubjectId === cs.id && a.teacherId),
+    )
+    if (unassigned.length > 0) {
+      setError('Assign a teacher to every subject-class offering before generating.')
       setActiveTab('subjects')
       return
     }
     try {
-      const result = generateTimetable(subjects, classes, teachers, DAYS, PERIODS_PER_DAY)
+      const result = generateTimetable(
+        classSubjects,
+        assignments,
+        classes,
+        teachers,
+        DAYS,
+        PERIODS_PER_DAY,
+      )
       setTimetable(result)
       setActiveTab('timetable')
     } catch (e) {
       setError(e.message)
     }
-  }, [subjectCatalog, subjects, classes, teachers])
+  }, [subjectCatalog, classSubjects, assignments, classes, teachers])
 
   const handleReset = useCallback(() => {
     if (confirm('Delete all data? This cannot be undone.')) {
       setSubjectCatalog([])
-      setSubjects([])
+      setClassSubjects([])
+      setAssignments([])
       setClasses([])
       setTeachers([])
       setTimetable(null)
@@ -112,14 +133,15 @@ export default function App() {
   }, [])
 
   const handleExcelImport = useCallback(
-    ({ subjectCatalog: catalog, subjects: subj, classes: cls, teachers: teach }) => {
+    ({ subjectCatalog: catalog, classSubjects: classSubs, assignments: assign, classes: cls, teachers: teach }) => {
       setSubjectCatalog(catalog)
-      setSubjects(subj)
+      setClassSubjects(classSubs)
+      setAssignments(assign)
       setClasses(cls)
       setTeachers(teach)
       setTimetable(null)
       setError('')
-      saveData(catalog, subj, cls, teach)
+      saveData(catalog, classSubs, assign, cls, teach)
       setActiveTab('subjects')
     },
     [saveData],
@@ -159,39 +181,44 @@ export default function App() {
               subjectCatalog={subjectCatalog}
               onCatalogChange={(catalog) => {
                 setSubjectCatalog(catalog)
-                saveData(catalog, subjects, classes, teachers)
+                saveData(catalog, classSubjects, assignments, classes, teachers)
               }}
-              subjects={subjects}
+              classSubjects={classSubjects}
+              onClassSubjectsChange={(classSubs) => {
+                setClassSubjects(classSubs)
+                saveData(subjectCatalog, classSubs, assignments, classes, teachers)
+              }}
+              assignments={assignments}
+              onAssignmentsChange={(assign) => {
+                setAssignments(assign)
+                saveData(subjectCatalog, classSubjects, assign, classes, teachers)
+              }}
               teachers={teachers}
               classes={classes}
-              onChange={(s) => {
-                setSubjects(s)
-                saveData(subjectCatalog, s, classes, teachers)
-              }}
               onTeachersChange={(t) => {
                 setTeachers(t)
-                saveData(subjectCatalog, subjects, classes, t)
+                saveData(subjectCatalog, classSubjects, assignments, classes, t)
               }}
             />
           )}
           {activeTab === 'classes' && (
             <ClassForm
               classes={classes}
-              subjects={subjects}
+              classSubjects={classSubjects}
               onChange={(c) => {
                 setClasses(c)
-                saveData(subjectCatalog, subjects, c, teachers)
+                saveData(subjectCatalog, classSubjects, assignments, c, teachers)
               }}
             />
           )}
           {activeTab === 'teachers' && (
             <TeacherForm
               teachers={teachers}
-              subjects={subjects}
+              classSubjects={classSubjects}
               classes={classes}
               onChange={(t) => {
                 setTeachers(t)
-                saveData(subjectCatalog, subjects, classes, t)
+                saveData(subjectCatalog, classSubjects, assignments, classes, t)
               }}
             />
           )}

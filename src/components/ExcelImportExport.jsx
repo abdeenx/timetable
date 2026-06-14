@@ -65,7 +65,8 @@ export default function ExcelImportExport({
 
       onImport({
         subjectCatalog: result.subjectCatalog,
-        subjects: result.subjects,
+        classSubjects: result.classSubjects,
+        assignments: result.assignments,
         classes: result.classes,
         teachers: result.teachers,
       })
@@ -88,7 +89,7 @@ export default function ExcelImportExport({
       <h2>Excel import / export</h2>
       <p className="form-help">
         Download the template and fill in three separate lists: classes, teachers, and subject names.
-        After upload, go to the Subjects tab to assign each subject to a class and teacher.
+        After upload, go to the Subjects tab to set hours per class and assign teachers.
       </p>
 
       <div className="excel-actions">

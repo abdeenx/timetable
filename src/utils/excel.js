@@ -49,7 +49,7 @@ const INSTRUCTIONS = [
   [],
   ['Tips'],
   ['  • Keep sheet names unchanged (Classes, Teachers, Subjects).'],
-  ['  • Assign subjects to classes and teachers in the web app after upload.'],
+  ['  • Set hours per class and assign teachers in the web app after upload.'],
 ]
 
 let idCounter = 0
@@ -159,7 +159,15 @@ export function parseExcelFile(arrayBuffer) {
   if (!teacherRows) errors.push('Missing "Teachers" sheet.')
   if (!subjectRows) errors.push('Missing "Subjects" sheet.')
   if (errors.length) {
-    return { errors, warnings, classes: [], teachers: [], subjectCatalog: [], subjects: [] }
+    return {
+      errors,
+      warnings,
+      classes: [],
+      teachers: [],
+      subjectCatalog: [],
+      classSubjects: [],
+      assignments: [],
+    }
   }
 
   const classes = []
@@ -241,7 +249,15 @@ export function parseExcelFile(arrayBuffer) {
   }
 
   if (errors.length) {
-    return { errors, warnings, classes: [], teachers: [], subjectCatalog: [], subjects: [] }
+    return {
+      errors,
+      warnings,
+      classes: [],
+      teachers: [],
+      subjectCatalog: [],
+      classSubjects: [],
+      assignments: [],
+    }
   }
 
   return {
@@ -250,7 +266,8 @@ export function parseExcelFile(arrayBuffer) {
     classes,
     teachers,
     subjectCatalog,
-    subjects: [],
+    classSubjects: [],
+    assignments: [],
   }
 }
 

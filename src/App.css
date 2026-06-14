@@ -228,6 +228,54 @@ body {
 }
 .btn-danger:hover { background: #fef2f2; }
 
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.btn-icon {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-edit:hover { background: var(--bg); }
+.btn-save {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-save:hover { background: var(--primary-hover); }
+.btn-cancel:hover { background: var(--bg); }
+.table-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  background: var(--surface);
+}
+.form-inline-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+.edit-detail-row td {
+  background: #f8fafc;
+  border-bottom: 2px solid var(--border);
+}
+.edit-checkbox-groups {
+  margin: 0;
+}
+
 /* Forms */
 .form-container { 
   background: var(--surface);
