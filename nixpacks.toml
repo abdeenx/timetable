@@ -1,0 +1,4 @@
+# Use npm install instead of npm ci — optional deps (e.g. @emnapi/* from Vite/Rolldown)
+# resolve differently on Linux vs macOS, which breaks strict lockfile checks in CI.
+[phases.install]
+cmds = ["npm install --no-audit --no-fund"]
