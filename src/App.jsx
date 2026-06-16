@@ -7,7 +7,7 @@ import Sidebar from './components/Sidebar'
 import InstallPrompt from './components/InstallPrompt'
 import ExcelImportExport from './components/ExcelImportExport'
 import { generateTimetable } from './utils/generator'
-import { migrateLegacySubjects, syncTeacherLinks } from './utils/subjects'
+import { migrateLegacySubjects } from './utils/subjects'
 import './App.css'
 
 const PERIODS_PER_DAY = 8
@@ -78,17 +78,47 @@ export default function App() {
         catalog = buildCatalogFromSubjects(data.subjects)
       }
 
-      const syncedTeachers = syncTeacherLinks(
-        data.teachers || [],
-        loadedClassSubjects,
-        loadedAssignments,
-      )
+      const migratedTeachers = (data.teachers || []).map((t) => {
+        // Migrate subject mapping:
+        // - new: subjectCatalogIds[]
+        // - old: classSubjectIds[]/subjectIds[] (classSubject ids)
+        let subjectCatalogIds = t.subjectCatalogIds
+        if (!Array.isArray(subjectCatalogIds) || subjectCatalogIds.length === 0) {
+          const legacyClassSubjectIds = t.classSubjectIds?.length ? t.classSubjectIds : t.subjectIds || []
+          subjectCatalogIds = [
+            ...new Set(
+              (legacyClassSubjectIds || [])
+                .map((csId) => loadedClassSubjects.find((cs) => cs.id === csId)?.catalogId)
+                .filter(Boolean),
+            ),
+          ]
+        }
+
+        // Migrate availability mapping:
+        // - new: availableClassIds[] + availableGrades[]
+        // - old: classIds[]
+        const availableClassIds = Array.isArray(t.availableClassIds)
+          ? t.availableClassIds
+          : Array.isArray(t.classIds)
+            ? t.classIds
+            : []
+        const availableGrades = Array.isArray(t.availableGrades)
+          ? t.availableGrades
+          : [...new Set((availableClassIds || []).map((id) => (data.classes || []).find((c) => c.id === id)?.grade).filter(Boolean))]
+
+        return {
+          ...t,
+          subjectCatalogIds,
+          availableClassIds,
+          availableGrades,
+        }
+      })
 
       setSubjectCatalog(catalog)
       setClassSubjects(loadedClassSubjects)
       setAssignments(loadedAssignments)
       setClasses(data.classes || [])
-      setTeachers(syncedTeachers)
+      setTeachers(migratedTeachers)
       setPeriodDurationMinutes(
         Number.isFinite(parseInt(data.periodDurationMinutes, 10))
           ? parseInt(data.periodDurationMinutes, 10)
@@ -233,6 +263,63 @@ export default function App() {
     [saveData, periodDurationMinutes, breaks, weekStartDay, weekLength, firstPeriodStartTime],
   )
 
+  const handleRestoreBackup = useCallback(
+    (restored) => {
+      const nextCatalog = restored.subjectCatalog || []
+      const nextClassSubjects = restored.classSubjects || []
+      const nextAssignments = restored.assignments || []
+      const nextClasses = restored.classes || []
+      const nextTeachers = restored.teachers || []
+      const nextPeriodMinutes = Number.isFinite(parseInt(restored.periodDurationMinutes, 10))
+        ? parseInt(restored.periodDurationMinutes, 10)
+        : 45
+      const nextWeekStartDay =
+        typeof restored.weekStartDay === 'string' && WEEK_DAYS.includes(restored.weekStartDay)
+          ? restored.weekStartDay
+          : 'Monday'
+      const parsedWeekLength = parseInt(restored.weekLength, 10)
+      const nextWeekLength =
+        Number.isFinite(parsedWeekLength) && parsedWeekLength >= 1 && parsedWeekLength <= 7
+          ? parsedWeekLength
+          : 5
+      const nextFirstPeriodStartTime =
+        typeof restored.firstPeriodStartTime === 'string' &&
+        restored.firstPeriodStartTime.match(/^\d{2}:\d{2}$/)
+          ? restored.firstPeriodStartTime
+          : '08:00'
+      const nextBreaks =
+        Array.isArray(restored.breaks) && restored.breaks.length > 0 ? restored.breaks : breaks
+
+      setSubjectCatalog(nextCatalog)
+      setClassSubjects(nextClassSubjects)
+      setAssignments(nextAssignments)
+      setClasses(nextClasses)
+      setTeachers(nextTeachers)
+      setPeriodDurationMinutes(nextPeriodMinutes)
+      setWeekStartDay(nextWeekStartDay)
+      setWeekLength(nextWeekLength)
+      setFirstPeriodStartTime(nextFirstPeriodStartTime)
+      setBreaks(nextBreaks)
+      setTimetable(null)
+      setError('')
+
+      saveData(
+        nextCatalog,
+        nextClassSubjects,
+        nextAssignments,
+        nextClasses,
+        nextTeachers,
+        nextPeriodMinutes,
+        nextBreaks,
+        nextWeekStartDay,
+        nextWeekLength,
+        nextFirstPeriodStartTime,
+      )
+      setActiveTab('subjects')
+    },
+    [saveData, breaks],
+  )
+
   return (
     <div className="app">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -260,7 +347,20 @@ export default function App() {
             teachers={teachers}
             subjectCatalog={subjectCatalog}
             breaks={breaks}
+            backupState={{
+              subjectCatalog,
+              classSubjects,
+              assignments,
+              classes,
+              teachers,
+              periodDurationMinutes,
+              weekStartDay,
+              weekLength,
+              firstPeriodStartTime,
+              breaks,
+            }}
             onImport={handleExcelImport}
+            onRestore={handleRestoreBackup}
             onError={setError}
           />
           {activeTab === 'subjects' && (
@@ -356,7 +456,7 @@ export default function App() {
           {activeTab === 'teachers' && (
             <TeacherForm
               teachers={teachers}
-              classSubjects={classSubjects}
+              subjectCatalog={subjectCatalog}
               classes={classes}
               onChange={(t) => {
                 setTeachers(t)

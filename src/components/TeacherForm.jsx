@@ -1,29 +1,25 @@
 import { Fragment, useState } from 'react'
 import { formatClassLabel } from '../utils/classes'
-import { getClassSubjectLabel } from '../utils/subjects'
 import RowActions from './RowActions'
 
-export default function TeacherForm({ teachers, classSubjects, classes, onChange }) {
+export default function TeacherForm({ teachers, subjectCatalog, classes, onChange }) {
   const [name, setName] = useState('')
   const [maxHours, setMaxHours] = useState(30)
-  const [selectedClassSubjectIds, setSelectedClassSubjectIds] = useState([])
-  const [selectedClasses, setSelectedClasses] = useState([])
+  const [selectedSubjectCatalogIds, setSelectedSubjectCatalogIds] = useState([])
+  const [selectedAvailableGrades, setSelectedAvailableGrades] = useState([])
+  const [selectedAvailableClasses, setSelectedAvailableClasses] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [editDraft, setEditDraft] = useState({
     name: '',
     maxHoursPerWeek: 30,
-    classSubjectIds: [],
-    classIds: [],
+    subjectCatalogIds: [],
+    availableGrades: [],
+    availableClassIds: [],
   })
   const [editError, setEditError] = useState('')
 
-  const classSubjectOptions = classSubjects.map((cs) => ({
-    id: cs.id,
-    label: getClassSubjectLabel(cs, classes, formatClassLabel),
-  }))
-
-  const getTeacherClassSubjectIds = (teacher) =>
-    teacher.classSubjectIds?.length ? teacher.classSubjectIds : teacher.subjectIds || []
+  const gradeOptions = [...new Set(classes.map((c) => c.grade).filter(Boolean))].sort()
+  const subjectOptions = (subjectCatalog || []).map((s) => ({ id: s.id, name: s.name }))
 
   const addTeacher = () => {
     if (!name.trim()) return
@@ -33,25 +29,26 @@ export default function TeacherForm({ teachers, classSubjects, classes, onChange
         id: Date.now().toString(),
         name: name.trim(),
         maxHoursPerWeek: parseInt(maxHours, 10) || 30,
-        classSubjectIds: [...selectedClassSubjectIds],
-        classIds: [...selectedClasses],
-        subjectIds: [...selectedClassSubjectIds],
+        subjectCatalogIds: [...selectedSubjectCatalogIds],
+        availableGrades: [...selectedAvailableGrades],
+        availableClassIds: [...selectedAvailableClasses],
       },
     ])
     setName('')
     setMaxHours(30)
-    setSelectedClassSubjectIds([])
-    setSelectedClasses([])
+    setSelectedSubjectCatalogIds([])
+    setSelectedAvailableGrades([])
+    setSelectedAvailableClasses([])
   }
 
   const startEdit = (teacher) => {
-    const classSubjectIds = getTeacherClassSubjectIds(teacher)
     setEditingId(teacher.id)
     setEditDraft({
       name: teacher.name,
       maxHoursPerWeek: teacher.maxHoursPerWeek,
-      classSubjectIds: [...classSubjectIds],
-      classIds: [...teacher.classIds],
+      subjectCatalogIds: [...(teacher.subjectCatalogIds || [])],
+      availableGrades: [...(teacher.availableGrades || [])],
+      availableClassIds: [...(teacher.availableClassIds || teacher.classIds || [])],
     })
     setEditError('')
   }
@@ -79,9 +76,9 @@ export default function TeacherForm({ teachers, classSubjects, classes, onChange
               ...t,
               name: trimmedName,
               maxHoursPerWeek: maxHoursValue,
-              classSubjectIds: [...editDraft.classSubjectIds],
-              classIds: [...editDraft.classIds],
-              subjectIds: [...editDraft.classSubjectIds],
+              subjectCatalogIds: [...editDraft.subjectCatalogIds],
+              availableGrades: [...editDraft.availableGrades],
+              availableClassIds: [...editDraft.availableClassIds],
             }
           : t,
       ),
@@ -95,67 +92,96 @@ export default function TeacherForm({ teachers, classSubjects, classes, onChange
     onChange(teachers.filter((t) => t.id !== id))
   }
 
-  const toggleDraftClassSubject = (id) => {
+  const toggleDraftSubject = (id) => {
     setEditDraft((prev) => ({
       ...prev,
-      classSubjectIds: prev.classSubjectIds.includes(id)
-        ? prev.classSubjectIds.filter((x) => x !== id)
-        : [...prev.classSubjectIds, id],
+      subjectCatalogIds: prev.subjectCatalogIds.includes(id)
+        ? prev.subjectCatalogIds.filter((x) => x !== id)
+        : [...prev.subjectCatalogIds, id],
+    }))
+  }
+
+  const toggleDraftGrade = (grade) => {
+    setEditDraft((prev) => ({
+      ...prev,
+      availableGrades: prev.availableGrades.includes(grade)
+        ? prev.availableGrades.filter((x) => x !== grade)
+        : [...prev.availableGrades, grade],
     }))
   }
 
   const toggleDraftClass = (id) => {
     setEditDraft((prev) => ({
       ...prev,
-      classIds: prev.classIds.includes(id)
-        ? prev.classIds.filter((x) => x !== id)
-        : [...prev.classIds, id],
+      availableClassIds: prev.availableClassIds.includes(id)
+        ? prev.availableClassIds.filter((x) => x !== id)
+        : [...prev.availableClassIds, id],
     }))
   }
 
-  const toggleClassSubject = (id) => {
-    setSelectedClassSubjectIds((prev) =>
+  const toggleSubject = (id) => {
+    setSelectedSubjectCatalogIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     )
   }
 
+  const toggleGrade = (grade) => {
+    setSelectedAvailableGrades((prev) =>
+      prev.includes(grade) ? prev.filter((x) => x !== grade) : [...prev, grade],
+    )
+  }
+
   const toggleClass = (id) => {
-    setSelectedClasses((prev) =>
+    setSelectedAvailableClasses((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     )
   }
 
   const renderCheckboxGroups = (
-    classSubjectIds,
-    classIds,
-    onClassSubjectToggle,
+    subjectCatalogIds,
+    availableGrades,
+    availableClassIds,
+    onSubjectToggle,
+    onGradeToggle,
     onClassToggle,
   ) => (
     <div className="checkbox-groups edit-checkbox-groups">
       <div className="checkbox-group">
-        <strong>Teaches subject-class:</strong>
-        {classSubjectOptions.length === 0 && (
-          <p className="dim">Add subject-class hours on the Subjects tab first.</p>
-        )}
-        {classSubjectOptions.map(({ id, label }) => (
+        <strong>Teaches subjects:</strong>
+        {subjectOptions.length === 0 && <p className="dim">No subjects in list yet.</p>}
+        {subjectOptions.map(({ id, name: subjName }) => (
           <label key={id} className="checkbox-label">
             <input
               type="checkbox"
-              checked={classSubjectIds.includes(id)}
-              onChange={() => onClassSubjectToggle(id)}
+              checked={subjectCatalogIds.includes(id)}
+              onChange={() => onSubjectToggle(id)}
             />
-            {label}
+            {subjName}
           </label>
         ))}
       </div>
       <div className="checkbox-group">
-        <strong>Teaches classes:</strong>
+        <strong>Available grades:</strong>
+        {gradeOptions.length === 0 && <p className="dim">No grades yet (add classes first).</p>}
+        {gradeOptions.map((g) => (
+          <label key={g} className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={availableGrades.includes(g)}
+              onChange={() => onGradeToggle(g)}
+            />
+            {g}
+          </label>
+        ))}
+      </div>
+      <div className="checkbox-group">
+        <strong>Available classes:</strong>
         {classes.length === 0 && <p className="dim">No classes added yet.</p>}
         {classes.map((c) => (
           <label key={c.id} className="checkbox-label">
             <input
               type="checkbox"
-              checked={classIds.includes(c.id)}
+              checked={availableClassIds.includes(c.id)}
               onChange={() => onClassToggle(c.id)}
             />
             {formatClassLabel(c)}
@@ -196,9 +222,11 @@ export default function TeacherForm({ teachers, classSubjects, classes, onChange
         </div>
 
         {renderCheckboxGroups(
-          selectedClassSubjectIds,
-          selectedClasses,
-          toggleClassSubject,
+          selectedSubjectCatalogIds,
+          selectedAvailableGrades,
+          selectedAvailableClasses,
+          toggleSubject,
+          toggleGrade,
           toggleClass,
         )}
       </div>
@@ -217,11 +245,13 @@ export default function TeacherForm({ teachers, classSubjects, classes, onChange
         </thead>
         <tbody>
           {teachers.map((t) => {
-            const teacherClassSubjectIds = getTeacherClassSubjectIds(t)
-            const teacherOfferings = classSubjects.filter((cs) =>
-              teacherClassSubjectIds.includes(cs.id),
+            const teacherSubjects = (t.subjectCatalogIds || [])
+              .map((id) => subjectCatalog.find((s) => s.id === id)?.name)
+              .filter(Boolean)
+            const teacherGrades = t.availableGrades || []
+            const teacherClasses = classes.filter((c) =>
+              (t.availableClassIds || t.classIds || []).includes(c.id),
             )
-            const teacherClasses = classes.filter((c) => t.classIds.includes(c.id))
             const isEditing = editingId === t.id
 
             return (
@@ -240,9 +270,8 @@ export default function TeacherForm({ teachers, classSubjects, classes, onChange
                     )}
                   </td>
                   <td>
-                    {teacherOfferings
-                      .map((cs) => getClassSubjectLabel(cs, classes, formatClassLabel))
-                      .join(', ') || '—'}
+                    {teacherSubjects.join(', ') || '—'}
+                    {teacherGrades.length > 0 ? ` (Grades: ${teacherGrades.join(', ')})` : ''}
                   </td>
                   <td>{teacherClasses.map((c) => formatClassLabel(c)).join(', ') || '—'}</td>
                   <td>
@@ -275,9 +304,11 @@ export default function TeacherForm({ teachers, classSubjects, classes, onChange
                   <tr key={`${t.id}-edit`} className="edit-detail-row">
                     <td colSpan="5">
                       {renderCheckboxGroups(
-                        editDraft.classSubjectIds,
-                        editDraft.classIds,
-                        toggleDraftClassSubject,
+                        editDraft.subjectCatalogIds,
+                        editDraft.availableGrades,
+                        editDraft.availableClassIds,
+                        toggleDraftSubject,
+                        toggleDraftGrade,
                         toggleDraftClass,
                       )}
                     </td>

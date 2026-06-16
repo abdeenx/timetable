@@ -5,16 +5,20 @@ import {
   parseExcelFile,
   readFileAsArrayBuffer,
 } from '../utils/excel'
+import { downloadBackup, parseBackup, readFileAsText } from '../utils/backup'
 
 export default function ExcelImportExport({
   classes,
   teachers,
   subjectCatalog,
   breaks,
+  backupState,
   onImport,
+  onRestore,
   onError,
 }) {
   const fileInputRef = useRef(null)
+  const backupInputRef = useRef(null)
   const [status, setStatus] = useState(null)
   const [warnings, setWarnings] = useState([])
 
@@ -29,6 +33,51 @@ export default function ExcelImportExport({
   const handleDownloadData = () => {
     downloadCurrentData(classes, teachers, subjectCatalog, breaks)
     setStatus({ type: 'success', message: 'Lists exported to Excel. Assignments stay in the app.' })
+  }
+
+  const handleExportBackup = () => {
+    setWarnings([])
+    onError('')
+    try {
+      downloadBackup(backupState)
+      setStatus({ type: 'success', message: 'Full backup downloaded (all data, including assignments and settings).' })
+    } catch {
+      setStatus({ type: 'error', message: 'Could not create the backup file.' })
+    }
+  }
+
+  const handleBackupFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setStatus(null)
+    setWarnings([])
+    onError('')
+
+    if (!file.name.match(/\.json$/i)) {
+      setStatus({ type: 'error', message: 'Please upload a backup file (.json).' })
+      return
+    }
+
+    if (hasData) {
+      const replace = confirm(
+        'Restoring a backup will replace ALL current data (classes, teachers, subjects, assignments, and settings). Continue?',
+      )
+      if (!replace) return
+    }
+
+    try {
+      const text = await readFileAsText(file)
+      const restored = parseBackup(text)
+      onRestore(restored)
+      setStatus({ type: 'success', message: 'Backup restored. All data and settings were replaced.' })
+    } catch (e) {
+      setStatus({
+        type: 'error',
+        message: e?.message || 'Could not read the backup file. Check the format and try again.',
+      })
+    }
   }
 
   const handleFileChange = async (event) => {
@@ -121,6 +170,39 @@ export default function ExcelImportExport({
           className="excel-file-input"
           onChange={handleFileChange}
         />
+      </div>
+
+      <div className="excel-backup">
+        <h3>Backup &amp; migration</h3>
+        <p className="form-help">
+          Export everything (classes, teachers, subjects, periods, teacher assignments, breaks, and schedule
+          settings) into a single compact file, then restore it on another device.
+        </p>
+        <div className="excel-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={handleExportBackup}
+            disabled={!hasData}
+            title={hasData ? 'Export all data to a backup file' : 'Add data first to export'}
+          >
+            Export all data
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => backupInputRef.current?.click()}
+          >
+            Restore from backup
+          </button>
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="excel-file-input"
+            onChange={handleBackupFileChange}
+          />
+        </div>
       </div>
 
       {status && (

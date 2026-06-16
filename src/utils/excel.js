@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx'
 import { classCompositeKey, formatClassLabel } from './classes'
+import { fileTimestamp } from './datetime'
+import { safeFilename } from './filenames'
 
 const SHEET = {
   INSTRUCTIONS: 'Instructions',
@@ -136,7 +138,7 @@ function buildWorkbook({
 
 export function downloadTemplate() {
   idCounter = 0
-  XLSX.writeFile(buildWorkbook(), 'timetable-template.xlsx')
+  XLSX.writeFile(buildWorkbook(), safeFilename(`timetable-template-${fileTimestamp()}`, 'xlsx'))
 }
 
 export function downloadCurrentData(classes, teachers, subjectCatalog, breaks = []) {
@@ -168,7 +170,7 @@ export function downloadCurrentData(classes, teachers, subjectCatalog, breaks = 
     includeInstructions: true,
   })
 
-  XLSX.writeFile(wb, 'timetable-data.xlsx')
+  XLSX.writeFile(wb, safeFilename(`timetable-data-${fileTimestamp()}`, 'xlsx'))
 }
 
 export function parseExcelFile(arrayBuffer) {

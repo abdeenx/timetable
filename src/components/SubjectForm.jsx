@@ -3,7 +3,6 @@ import { formatClassLabel } from '../utils/classes'
 import {
   classSubjectKey,
   getClassSubjectLabel,
-  syncTeacherLinks,
 } from '../utils/subjects'
 import RowActions from './RowActions'
 
@@ -55,9 +54,6 @@ export default function SubjectForm({
     const nextAssignments = assignments.filter((a) => !removedIds.has(a.classSubjectId))
     onClassSubjectsChange(nextClassSubjects)
     onAssignmentsChange(nextAssignments)
-    if (onTeachersChange) {
-      onTeachersChange(syncTeacherLinks(teachers, nextClassSubjects, nextAssignments))
-    }
   }
 
   const startCatalogEdit = (entry) => {
@@ -183,9 +179,6 @@ export default function SubjectForm({
     const nextAssignments = assignments.filter((a) => a.classSubjectId !== id)
     onClassSubjectsChange(nextClassSubjects)
     onAssignmentsChange(nextAssignments)
-    if (onTeachersChange) {
-      onTeachersChange(syncTeacherLinks(teachers, nextClassSubjects, nextAssignments))
-    }
   }
 
   const addAssignment = () => {
@@ -201,9 +194,6 @@ export default function SubjectForm({
       },
     ]
     onAssignmentsChange(nextAssignments)
-    if (onTeachersChange) {
-      onTeachersChange(syncTeacherLinks(teachers, classSubjects, nextAssignments))
-    }
     setClassSubjectId('')
     setTeacherId('')
   }
@@ -213,17 +203,11 @@ export default function SubjectForm({
       a.id === assignmentId ? { ...a, teacherId: nextTeacherId } : a,
     )
     onAssignmentsChange(nextAssignments)
-    if (onTeachersChange) {
-      onTeachersChange(syncTeacherLinks(teachers, classSubjects, nextAssignments))
-    }
   }
 
   const removeAssignment = (id) => {
     const nextAssignments = assignments.filter((a) => a.id !== id)
     onAssignmentsChange(nextAssignments)
-    if (onTeachersChange) {
-      onTeachersChange(syncTeacherLinks(teachers, classSubjects, nextAssignments))
-    }
   }
 
   const selectedClass = classes.find((c) => c.id === classId)
@@ -231,6 +215,24 @@ export default function SubjectForm({
   const unassignedOfferings = classSubjects.filter(
     (cs) => !assignments.some((a) => a.classSubjectId === cs.id),
   )
+
+  const isTeacherAssignable = (teacher, offering) => {
+    if (!teacher || !offering) return false
+    const teachesSubject =
+      Array.isArray(teacher.subjectCatalogIds) && teacher.subjectCatalogIds.includes(offering.catalogId)
+
+    const availableClasses = teacher.availableClassIds || teacher.classIds || []
+    const availableGrades = teacher.availableGrades || []
+
+    const classOk =
+      !availableClasses.length || availableClasses.includes(offering.classId)
+
+    const grade = classes.find((c) => c.id === offering.classId)?.grade
+    const gradeOk =
+      !availableGrades.length || (grade && availableGrades.includes(grade))
+
+    return teachesSubject && classOk && gradeOk
+  }
 
   return (
     <>
@@ -476,11 +478,16 @@ export default function SubjectForm({
           </select>
           <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
             <option value="">Select teacher...</option>
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
+            {(() => {
+              const offering = classSubjects.find((cs) => cs.id === classSubjectId)
+              return teachers
+                .filter((t) => offering && isTeacherAssignable(t, offering))
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))
+            })()}
           </select>
           <button
             type="button"
@@ -516,11 +523,13 @@ export default function SubjectForm({
                       onChange={(e) => updateAssignmentTeacher(assignment.id, e.target.value)}
                       aria-label={`Teacher for ${offering.name}`}
                     >
-                      {teachers.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
+                      {teachers
+                        .filter((t) => isTeacherAssignable(t, offering))
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
                     </select>
                   </td>
                   <td>

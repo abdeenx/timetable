@@ -1,4 +1,6 @@
 import { Fragment } from 'react'
+import { fileTimestamp } from '../utils/datetime'
+import { safeFilename } from '../utils/filenames'
 
 export default function TimetableView({
   timetable,
@@ -392,7 +394,7 @@ function downloadCSV(csv) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'timetable.csv'
+  a.download = safeFilename(`timetable-${fileTimestamp()}`, 'csv')
   a.click()
   URL.revokeObjectURL(url)
 }

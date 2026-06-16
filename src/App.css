@@ -121,6 +121,12 @@ body {
   border: 1px solid #fecaca;
 }
 .excel-warnings { margin-top: 12px; margin-bottom: 0; }
+.excel-backup {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.excel-backup h3 { font-size: 15px; margin-bottom: 4px; }
 .btn-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
