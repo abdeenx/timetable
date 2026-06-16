@@ -8,6 +8,10 @@ export default function TimetableView({
   onPeriodDurationMinutesChange,
   breaks = [],
   onBreaksChange,
+  weekStartDay,
+  weekLength,
+  firstPeriodStartTime,
+  onWeekSettingsChange,
 }) {
   if (!timetable) {
     return (
@@ -29,6 +33,23 @@ export default function TimetableView({
     }))
     .filter((b) => b.afterPeriod >= 1 && b.afterPeriod <= periods - 1)
     .sort((a, b) => a.afterPeriod - b.afterPeriod)
+
+  const weekDayOptions = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ]
+
+  const periodTimes = buildPeriodTimes({
+    periods,
+    firstPeriodStartTime,
+    periodDurationMinutes,
+    breaks: normalizedBreaks,
+  })
 
   const addBreak = () => {
     const next = [
@@ -74,6 +95,61 @@ export default function TimetableView({
           style={{ width: '110px' }}
         />
         <span className="label">minutes</span>
+      </div>
+
+      <div className="form-row" style={{ marginTop: 6 }}>
+        <label className="label" htmlFor="week-start">
+          Week starts
+        </label>
+        <select
+          id="week-start"
+          value={weekStartDay || 'Monday'}
+          onChange={(e) =>
+            onWeekSettingsChange?.({
+              nextWeekStartDay: e.target.value,
+            })
+          }
+          style={{ maxWidth: 220 }}
+        >
+          {weekDayOptions.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+
+        <label className="label" htmlFor="week-length">
+          Days/week
+        </label>
+        <input
+          id="week-length"
+          type="number"
+          min="1"
+          max="7"
+          value={weekLength ?? days.length}
+          onChange={(e) => {
+            const next = parseInt(e.target.value, 10)
+            onWeekSettingsChange?.({
+              nextWeekLength: Number.isFinite(next) ? Math.min(7, Math.max(1, next)) : 5,
+            })
+          }}
+          style={{ width: '110px' }}
+        />
+
+        <label className="label" htmlFor="first-period-time">
+          First period
+        </label>
+        <input
+          id="first-period-time"
+          type="time"
+          value={firstPeriodStartTime || '08:00'}
+          onChange={(e) =>
+            onWeekSettingsChange?.({
+              nextFirstPeriodStartTime: e.target.value,
+            })
+          }
+          style={{ width: '140px' }}
+        />
       </div>
 
       <div className="form-row" style={{ marginTop: 6 }}>
@@ -172,49 +248,59 @@ export default function TimetableView({
             <table className="timetable-grid">
               <thead>
                 <tr>
-                  <th>Time</th>
-                  {days.map(d => <th key={d}>{d}</th>)}
+                  <th>Day</th>
+                  {Array.from({ length: periods }, (_, p) => {
+                    const afterPeriod = p + 1
+                    const breaksAfter = normalizedBreaks.filter((b) => b.afterPeriod === afterPeriod)
+                    const timeLabel =
+                      periodTimes[p] ? `${periodTimes[p].start}-${periodTimes[p].end}` : ''
+                    return (
+                      <Fragment key={`head-p-${p}`}>
+                        <th>
+                          Period {p + 1}
+                          {timeLabel ? ` (${timeLabel})` : ''}
+                        </th>
+                        {breaksAfter.map((b) => (
+                          <th key={`head-break-${b.id}`} className="break-cell break-label">
+                            {b.label}{' '}
+                            {periodTimes[p]
+                              ? `(${periodTimes[p].end}-${addMinutes(periodTimes[p].end, b.durationMinutes)})`
+                              : `(${b.durationMinutes}m)`}
+                          </th>
+                        ))}
+                      </Fragment>
+                    )
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: periods }, (_, p) => {
-                  const afterPeriod = p + 1
-                  const breakAfter = normalizedBreaks.filter((b) => b.afterPeriod === afterPeriod)
-                  return (
-                    <Fragment key={`p-${p}`}>
-                      <tr>
-                        <td className="period-num">
-                          Period {p + 1} ({periodDurationMinutes}m)
-                        </td>
-                        {days.map((d) => {
-                          const cell = schedule[className]?.[d]?.[p]
-                          return (
-                            <td key={d} className={cell ? 'has-class' : ''}>
-                              {cell ? (
-                                <>
-                                  <div className="cell-subject">{cell.subject}</div>
-                                  <div className="cell-teacher">{cell.teacher}</div>
-                                </>
-                              ) : cell === '' ? '' : null}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                      {breakAfter.map((b) => (
-                        <tr key={`break-${b.id}`} className="break-row">
-                          <td className="break-cell break-label">
-                            {b.label} ({b.durationMinutes}m)
+                {days.map((d) => (
+                  <tr key={d}>
+                    <td className="period-num">{d}</td>
+                    {Array.from({ length: periods }, (_, p) => {
+                      const afterPeriod = p + 1
+                      const breaksAfter = normalizedBreaks.filter((b) => b.afterPeriod === afterPeriod)
+                      const cell = schedule[className]?.[d]?.[p]
+                      return (
+                        <Fragment key={`cell-${d}-${p}`}>
+                          <td className={cell ? 'has-class' : ''}>
+                            {cell ? (
+                              <>
+                                <div className="cell-subject">{cell.subject}</div>
+                                <div className="cell-teacher">{cell.teacher}</div>
+                              </>
+                            ) : cell === '' ? '' : null}
                           </td>
-                          {days.map((d) => (
-                            <td key={d} className="break-cell">
+                          {breaksAfter.map((b) => (
+                            <td key={`cell-break-${d}-${b.id}`} className="break-cell">
                               {b.label}
                             </td>
                           ))}
-                        </tr>
-                      ))}
-                    </Fragment>
-                  )
-                })}
+                        </Fragment>
+                      )
+                    })}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -251,6 +337,54 @@ function timetableToCSV(schedule, days, periods, breaks) {
     }
   }
   return csv
+}
+
+function parseTimeToMinutes(hhmm) {
+  const m = String(hhmm || '').match(/^(\d{2}):(\d{2})$/)
+  if (!m) return null
+  const h = parseInt(m[1], 10)
+  const min = parseInt(m[2], 10)
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h < 0 || h > 23 || min < 0 || min > 59) return null
+  return h * 60 + min
+}
+
+function minutesToTime(totalMinutes) {
+  const m = ((totalMinutes % 1440) + 1440) % 1440
+  const h = String(Math.floor(m / 60)).padStart(2, '0')
+  const min = String(m % 60).padStart(2, '0')
+  return `${h}:${min}`
+}
+
+function addMinutes(hhmm, deltaMinutes) {
+  const base = parseTimeToMinutes(hhmm)
+  if (base === null) return hhmm
+  return minutesToTime(base + (parseInt(deltaMinutes, 10) || 0))
+}
+
+function buildPeriodTimes({ periods, firstPeriodStartTime, periodDurationMinutes, breaks }) {
+  const first = parseTimeToMinutes(firstPeriodStartTime)
+  if (first === null) return []
+  const dur = parseInt(periodDurationMinutes, 10) || 45
+  const breaksByAfter = new Map()
+  for (const b of breaks || []) {
+    const after = parseInt(b.afterPeriod, 10)
+    if (!Number.isFinite(after)) continue
+    breaksByAfter.set(after, [...(breaksByAfter.get(after) || []), b])
+  }
+
+  const times = []
+  let cursor = first
+  for (let p = 1; p <= periods; p++) {
+    const start = cursor
+    const end = start + dur
+    times.push({ start: minutesToTime(start), end: minutesToTime(end) })
+    cursor = end
+    const breaksAfter = breaksByAfter.get(p) || []
+    for (const b of breaksAfter) {
+      cursor += parseInt(b.durationMinutes, 10) || 0
+    }
+  }
+  return times
 }
 
 function downloadCSV(csv) {

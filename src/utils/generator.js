@@ -106,6 +106,13 @@ export function generateTimetable(classSubjects, assignments, classes, teachers,
           const adjacentSame =
             (prev && prev.subjectId === subjectId) || (next && next.subjectId === subjectId)
           if (!adjacentSame) continue
+
+          // If we are creating a double period, the teacher must match across the consecutive periods.
+          // (If teacher is unassigned, allow it as long as the adjacent period is also unassigned.)
+          const intendedTeacherId = subj.teacher?.id || null
+          const adjacentCell =
+            prev?.subjectId === subjectId ? prev : next?.subjectId === subjectId ? next : null
+          if (adjacentCell && (adjacentCell.teacherId || null) !== intendedTeacherId) continue
         }
 
         const teacher = subj.teacher

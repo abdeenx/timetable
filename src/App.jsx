@@ -10,8 +10,18 @@ import { generateTimetable } from './utils/generator'
 import { migrateLegacySubjects, syncTeacherLinks } from './utils/subjects'
 import './App.css'
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const PERIODS_PER_DAY = 8
+const WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function buildDays(weekStartDay, weekLength) {
+  const startIndex = Math.max(0, WEEK_DAYS.indexOf(weekStartDay))
+  const len = Math.min(7, Math.max(1, parseInt(weekLength, 10) || 5))
+  const days = []
+  for (let i = 0; i < len; i++) {
+    days.push(WEEK_DAYS[(startIndex + i) % WEEK_DAYS.length])
+  }
+  return days
+}
 
 function buildCatalogFromSubjects(subjects) {
   const seen = new Map()
@@ -35,11 +45,16 @@ export default function App() {
   const [teachers, setTeachers] = useState([])
   const [timetable, setTimetable] = useState(null)
   const [periodDurationMinutes, setPeriodDurationMinutes] = useState(45)
+  const [weekStartDay, setWeekStartDay] = useState('Monday')
+  const [weekLength, setWeekLength] = useState(5)
+  const [firstPeriodStartTime, setFirstPeriodStartTime] = useState('08:00')
   const [breaks, setBreaks] = useState([
     { id: 'default-1', label: 'Lunch', durationMinutes: 30, afterPeriod: 2 },
     { id: 'default-2', label: 'Break', durationMinutes: 15, afterPeriod: 6 },
   ])
   const [error, setError] = useState('')
+
+  const days = buildDays(weekStartDay, weekLength)
 
   useEffect(() => {
     try {
@@ -79,13 +94,35 @@ export default function App() {
           ? parseInt(data.periodDurationMinutes, 10)
           : 45,
       )
+      if (typeof data.weekStartDay === 'string' && WEEK_DAYS.includes(data.weekStartDay)) {
+        setWeekStartDay(data.weekStartDay)
+      }
+      const loadedWeekLength = parseInt(data.weekLength, 10)
+      if (Number.isFinite(loadedWeekLength) && loadedWeekLength >= 1 && loadedWeekLength <= 7) {
+        setWeekLength(loadedWeekLength)
+      }
+      if (typeof data.firstPeriodStartTime === 'string' && data.firstPeriodStartTime.match(/^\d{2}:\d{2}$/)) {
+        setFirstPeriodStartTime(data.firstPeriodStartTime)
+      }
       if (Array.isArray(data.breaks) && data.breaks.length > 0) {
         setBreaks(data.breaks)
       }
     } catch {}
   }, [])
 
-  const saveData = useCallback((catalog, classSubs, assign, cls, teach, periodMinutes, breakList) => {
+  const saveData = useCallback(
+    (
+      catalog,
+      classSubs,
+      assign,
+      cls,
+      teach,
+      periodMinutes,
+      breakList,
+      nextWeekStartDay,
+      nextWeekLength,
+      nextFirstPeriodStartTime,
+    ) => {
     localStorage.setItem(
       'timetable-data',
       JSON.stringify({
@@ -95,10 +132,15 @@ export default function App() {
         classes: cls,
         teachers: teach,
         periodDurationMinutes: periodMinutes,
+        weekStartDay: nextWeekStartDay,
+        weekLength: nextWeekLength,
+        firstPeriodStartTime: nextFirstPeriodStartTime,
         breaks: breakList,
       }),
     )
-  }, [])
+    },
+    [],
+  )
 
   const handleGenerate = useCallback(() => {
     setError('')
@@ -124,7 +166,7 @@ export default function App() {
         assignments,
         classes,
         teachers,
-        DAYS,
+        days,
         PERIODS_PER_DAY,
       )
       setTimetable(result)
@@ -132,7 +174,7 @@ export default function App() {
     } catch (e) {
       setError(e.message)
     }
-  }, [subjectCatalog, classSubjects, assignments, classes, teachers])
+  }, [subjectCatalog, classSubjects, assignments, classes, teachers, days])
 
   const handleReset = useCallback(() => {
     if (confirm('Delete all data? This cannot be undone.')) {
@@ -143,6 +185,9 @@ export default function App() {
       setTeachers([])
       setTimetable(null)
       setPeriodDurationMinutes(45)
+      setWeekStartDay('Monday')
+      setWeekLength(5)
+      setFirstPeriodStartTime('08:00')
       setBreaks([
         { id: 'default-1', label: 'Lunch', durationMinutes: 30, afterPeriod: 2 },
         { id: 'default-2', label: 'Break', durationMinutes: 15, afterPeriod: 6 },
@@ -171,10 +216,21 @@ export default function App() {
       }
       setTimetable(null)
       setError('')
-      saveData(catalog, classSubs, assign, cls, teach, periodDurationMinutes, importedBreaks || breaks)
+      saveData(
+        catalog,
+        classSubs,
+        assign,
+        cls,
+        teach,
+        periodDurationMinutes,
+        importedBreaks || breaks,
+        weekStartDay,
+        weekLength,
+        firstPeriodStartTime,
+      )
       setActiveTab('subjects')
     },
-    [saveData, periodDurationMinutes, breaks],
+    [saveData, periodDurationMinutes, breaks, weekStartDay, weekLength, firstPeriodStartTime],
   )
 
   return (
@@ -220,6 +276,9 @@ export default function App() {
                   teachers,
                   periodDurationMinutes,
                   breaks,
+                  weekStartDay,
+                  weekLength,
+                  firstPeriodStartTime,
                 )
               }}
               classSubjects={classSubjects}
@@ -233,6 +292,9 @@ export default function App() {
                   teachers,
                   periodDurationMinutes,
                   breaks,
+                  weekStartDay,
+                  weekLength,
+                  firstPeriodStartTime,
                 )
               }}
               assignments={assignments}
@@ -246,6 +308,9 @@ export default function App() {
                   teachers,
                   periodDurationMinutes,
                   breaks,
+                  weekStartDay,
+                  weekLength,
+                  firstPeriodStartTime,
                 )
               }}
               teachers={teachers}
@@ -260,6 +325,9 @@ export default function App() {
                   t,
                   periodDurationMinutes,
                   breaks,
+                  weekStartDay,
+                  weekLength,
+                  firstPeriodStartTime,
                 )
               }}
             />
@@ -278,6 +346,9 @@ export default function App() {
                   teachers,
                   periodDurationMinutes,
                   breaks,
+                  weekStartDay,
+                  weekLength,
+                  firstPeriodStartTime,
                 )
               }}
             />
@@ -297,6 +368,9 @@ export default function App() {
                   t,
                   periodDurationMinutes,
                   breaks,
+                  weekStartDay,
+                  weekLength,
+                  firstPeriodStartTime,
                 )
               }}
             />
@@ -304,12 +378,43 @@ export default function App() {
           {activeTab === 'timetable' && (
             <TimetableView
               timetable={timetable}
-              days={DAYS}
+              days={days}
               periods={PERIODS_PER_DAY}
               periodDurationMinutes={periodDurationMinutes}
               onPeriodDurationMinutesChange={(nextMinutes) => {
                 setPeriodDurationMinutes(nextMinutes)
-                saveData(subjectCatalog, classSubjects, assignments, classes, teachers, nextMinutes, breaks)
+                saveData(
+                  subjectCatalog,
+                  classSubjects,
+                  assignments,
+                  classes,
+                  teachers,
+                  nextMinutes,
+                  breaks,
+                  weekStartDay,
+                  weekLength,
+                  firstPeriodStartTime,
+                )
+              }}
+              weekStartDay={weekStartDay}
+              weekLength={weekLength}
+              firstPeriodStartTime={firstPeriodStartTime}
+              onWeekSettingsChange={({ nextWeekStartDay, nextWeekLength, nextFirstPeriodStartTime }) => {
+                if (nextWeekStartDay) setWeekStartDay(nextWeekStartDay)
+                if (typeof nextWeekLength === 'number') setWeekLength(nextWeekLength)
+                if (typeof nextFirstPeriodStartTime === 'string') setFirstPeriodStartTime(nextFirstPeriodStartTime)
+                saveData(
+                  subjectCatalog,
+                  classSubjects,
+                  assignments,
+                  classes,
+                  teachers,
+                  periodDurationMinutes,
+                  breaks,
+                  nextWeekStartDay ?? weekStartDay,
+                  nextWeekLength ?? weekLength,
+                  nextFirstPeriodStartTime ?? firstPeriodStartTime,
+                )
               }}
               breaks={breaks}
               onBreaksChange={(nextBreaks) => {
@@ -322,6 +427,9 @@ export default function App() {
                   teachers,
                   periodDurationMinutes,
                   nextBreaks,
+                  weekStartDay,
+                  weekLength,
+                  firstPeriodStartTime,
                 )
               }}
             />
