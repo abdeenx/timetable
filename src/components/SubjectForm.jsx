@@ -21,7 +21,7 @@ export default function SubjectForm({
   const [catalogName, setCatalogName] = useState('')
   const [catalogId, setCatalogId] = useState('')
   const [classId, setClassId] = useState('')
-  const [hoursPerWeek, setHoursPerWeek] = useState(3)
+  const [periodsPerWeek, setPeriodsPerWeek] = useState(3)
   const [classSubjectId, setClassSubjectId] = useState('')
   const [teacherId, setTeacherId] = useState('')
   const [editingCatalogId, setEditingCatalogId] = useState(null)
@@ -111,12 +111,12 @@ export default function SubjectForm({
         catalogId,
         name: entry.name,
         classId,
-        hoursPerWeek: parseInt(hoursPerWeek, 10) || 3,
+        hoursPerWeek: parseInt(periodsPerWeek, 10) || 3,
       },
     ])
     setCatalogId('')
     setClassId('')
-    setHoursPerWeek(3)
+    setPeriodsPerWeek(3)
   }
 
   const startClassSubjectEdit = (cs) => {
@@ -237,7 +237,7 @@ export default function SubjectForm({
       <div className="form-container">
         <h2>Subject list</h2>
         <p className="form-help">
-          Subject names only — import from Excel or add here. Set weekly hours per class below, then assign teachers.
+          Subject names only — import from Excel or add here. Set weekly periods per class below, then assign teachers.
         </p>
 
         <div className="form-row">
@@ -307,9 +307,9 @@ export default function SubjectForm({
       </div>
 
       <div className="form-container">
-        <h2>Hours by class</h2>
+        <h2>Periods by class</h2>
         <p className="form-help">
-          Weekly hours apply to the subject in each class, independent of which teacher is assigned.
+          Weekly periods apply to the subject in each class, independent of which teacher is assigned.
         </p>
 
         {classSubjectEditError && <p className="form-inline-error">{classSubjectEditError}</p>}
@@ -335,12 +335,12 @@ export default function SubjectForm({
             type="number"
             min="1"
             max="40"
-            value={hoursPerWeek}
-            onChange={(e) => setHoursPerWeek(e.target.value)}
+            value={periodsPerWeek}
+            onChange={(e) => setPeriodsPerWeek(e.target.value)}
             style={{ width: '90px' }}
-            title="Hours per week for this subject in this class"
+            title="Periods per week for this subject in this class"
           />
-          <span className="label">hrs/wk</span>
+          <span className="label">periods/wk</span>
           <button
             type="button"
             className="btn-small"
@@ -354,7 +354,7 @@ export default function SubjectForm({
         {classId && selectedClass && (
           <div className="class-summary">
             <strong>{formatClassLabel(selectedClass)}</strong>:{' '}
-            {classOfferings.reduce((sum, cs) => sum + cs.hoursPerWeek, 0)} hrs/week scheduled
+            {classOfferings.reduce((sum, cs) => sum + cs.hoursPerWeek, 0)} periods/week scheduled
             {classOfferings.length > 0 && ` (${classOfferings.map((cs) => cs.name).join(', ')})`}
           </div>
         )}
@@ -364,7 +364,7 @@ export default function SubjectForm({
             <tr>
               <th>Subject</th>
               <th>Class</th>
-              <th>Hours/Week</th>
+              <th>Periods/Week</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -456,7 +456,7 @@ export default function SubjectForm({
       <div className="form-container">
         <h2>Assign teachers</h2>
         <p className="form-help">
-          Choose who teaches each subject-class. Hours come from the table above, not from the teacher assignment.
+          Choose who teaches each subject-class. Periods come from the table above, not from the teacher assignment.
         </p>
 
         {unassignedOfferings.length > 0 && (
@@ -470,7 +470,7 @@ export default function SubjectForm({
             <option value="">Select subject-class...</option>
             {classSubjects.map((cs) => (
               <option key={cs.id} value={cs.id}>
-                {getClassSubjectLabel(cs, classes, formatClassLabel)} ({cs.hoursPerWeek} hrs/wk)
+                {getClassSubjectLabel(cs, classes, formatClassLabel)} ({cs.hoursPerWeek} periods/wk)
               </option>
             ))}
           </select>
@@ -496,7 +496,7 @@ export default function SubjectForm({
           <thead>
             <tr>
               <th>Subject — Class</th>
-              <th>Hours/Week</th>
+              <th>Periods/Week</th>
               <th>Teacher</th>
               <th>Actions</th>
             </tr>

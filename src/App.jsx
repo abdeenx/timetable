@@ -99,7 +99,7 @@ export default function App() {
       return
     }
     if (classSubjects.length === 0) {
-      setError('Add at least one subject-class with weekly hours on the Subjects tab.')
+      setError('Add at least one subject-class with weekly periods on the Subjects tab.')
       return
     }
     const unassigned = classSubjects.filter(
