@@ -74,7 +74,7 @@ export default function ExcelImportExport({
       setWarnings(result.warnings)
       setStatus({
         type: 'success',
-        message: `Imported ${result.classes.length} classes, ${result.teachers.length} teachers, and ${result.subjectCatalog.length} subjects. Assign them on the Subjects tab.`,
+        message: `Imported ${result.classes.length} classes, ${result.teachers.length} teachers, and ${result.subjectCatalog.length} subjects. Set periods and assign teachers on the Subjects tab.`,
       })
     } catch {
       setStatus({
@@ -89,7 +89,7 @@ export default function ExcelImportExport({
       <h2>Excel import / export</h2>
       <p className="form-help">
         Download the template and fill in three separate lists: classes, teachers, and subject names.
-        After upload, go to the Subjects tab to set hours per class and assign teachers.
+        After upload, go to the Subjects tab to set periods per class and assign teachers.
       </p>
 
       <div className="excel-actions">

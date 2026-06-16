@@ -9,7 +9,7 @@ const SHEET = {
 }
 
 const CLASS_HEADERS = ['Class Name', 'Grade/Year']
-const TEACHER_HEADERS = ['Teacher Name', 'Max Hours/Week']
+const TEACHER_HEADERS = ['Teacher Name', 'Max Periods/Week']
 const SUBJECT_HEADERS = ['Subject Name']
 
 const TEMPLATE_CLASSES = [
@@ -19,8 +19,8 @@ const TEMPLATE_CLASSES = [
 ]
 
 const TEMPLATE_TEACHERS = [
-  { 'Teacher Name': 'Jane Smith', 'Max Hours/Week': 30 },
-  { 'Teacher Name': 'John Doe', 'Max Hours/Week': 25 },
+  { 'Teacher Name': 'Jane Smith', 'Max Periods/Week': 30 },
+  { 'Teacher Name': 'John Doe', 'Max Periods/Week': 25 },
 ]
 
 const TEMPLATE_SUBJECTS = [
@@ -33,7 +33,9 @@ const INSTRUCTIONS = [
   ['School Timetable Generator — Excel Import Guide'],
   [],
   ['Each sheet is a simple list. Do not repeat names across sheets.'],
-  ['After import, use the Subjects tab in the app to assign each subject to a class and teacher.'],
+  [
+    'After import, use the Subjects tab in the app to set periods per class and assign teachers.',
+  ],
   [],
   ['Classes sheet'],
   ['  • Class Name — required (e.g. A, 10A, Science)'],
@@ -41,7 +43,7 @@ const INSTRUCTIONS = [
   [],
   ['Teachers sheet'],
   ['  • Teacher Name — required'],
-  ['  • Max Hours/Week — required number (defaults to 30 if empty)'],
+  ['  • Max Periods/Week — required number (defaults to 30 if empty)'],
   [],
   ['Subjects sheet'],
   ['  • Subject Name — required (e.g. Mathematics, English)'],
@@ -49,7 +51,7 @@ const INSTRUCTIONS = [
   [],
   ['Tips'],
   ['  • Keep sheet names unchanged (Classes, Teachers, Subjects).'],
-  ['  • Set hours per class and assign teachers in the web app after upload.'],
+  ['  • Set periods per class and assign teachers in the web app after upload.'],
 ]
 
 let idCounter = 0
@@ -127,7 +129,7 @@ export function downloadCurrentData(classes, teachers, subjectCatalog) {
 
   const teacherRows = teachers.map((t) => ({
     'Teacher Name': t.name,
-    'Max Hours/Week': t.maxHoursPerWeek,
+    'Max Periods/Week': t.maxHoursPerWeek,
   }))
 
   const subjectRows = subjectCatalog.map((s) => ({
@@ -204,10 +206,17 @@ export function parseExcelFile(arrayBuffer) {
     }
 
     seenTeacherNames.add(key)
-    const maxRaw = getCell(row, 'Max Hours/Week', 'Max Hours', 'Max Hrs/Week')
+    const maxRaw = getCell(
+      row,
+      'Max Periods/Week',
+      'Max Hours/Week',
+      'Max Periods',
+      'Max Hours',
+      'Max Hrs/Week',
+    )
     const maxHours = maxRaw === '' ? 30 : parseInt(maxRaw, 10)
     if (Number.isNaN(maxHours) || maxHours < 1) {
-      errors.push(`Teachers row ${rowNum}: invalid max hours for "${name}".`)
+      errors.push(`Teachers row ${rowNum}: invalid max periods for "${name}".`)
       return
     }
 
