@@ -7,7 +7,11 @@ import Sidebar from './components/Sidebar'
 import InstallPrompt from './components/InstallPrompt'
 import ExcelImportExport from './components/ExcelImportExport'
 import { generateTimetable } from './utils/generator'
-import { migrateLegacySubjects } from './utils/subjects'
+import {
+  migrateLegacySubjects,
+  migrateClassSubjectsToGrade,
+  buildOfferings,
+} from './utils/subjects'
 import './App.css'
 
 const PERIODS_PER_DAY = 8
@@ -23,23 +27,59 @@ function buildDays(weekStartDay, weekLength) {
   return days
 }
 
-function buildCatalogFromSubjects(subjects) {
+function buildCatalogFromRows(rows) {
   const seen = new Map()
-  for (const subject of subjects) {
-    const key = subject.name?.toLowerCase()
+  for (const row of rows) {
+    const key = row.name?.toLowerCase()
     if (!key || seen.has(key)) continue
     seen.set(key, {
-      id: subject.catalogId || `catalog-${seen.size + 1}-${Date.now()}`,
-      name: subject.name,
+      id: row.catalogId || `catalog-${seen.size + 1}-${Date.now()}`,
+      name: row.name,
     })
   }
   return [...seen.values()]
 }
 
+function migrateTeachers(rawTeachers, legacyClassSubjects, classes) {
+  return rawTeachers.map((t) => {
+    let subjectCatalogIds = t.subjectCatalogIds
+    if (!Array.isArray(subjectCatalogIds) || subjectCatalogIds.length === 0) {
+      const legacyClassSubjectIds = t.classSubjectIds?.length ? t.classSubjectIds : t.subjectIds || []
+      subjectCatalogIds = [
+        ...new Set(
+          (legacyClassSubjectIds || [])
+            .map((csId) => legacyClassSubjects.find((cs) => cs.id === csId)?.catalogId)
+            .filter(Boolean),
+        ),
+      ]
+    }
+
+    // Teacher availability is by grade. Derive grades from any legacy
+    // class-based availability when grades aren't already present.
+    const legacyClassIds = Array.isArray(t.availableClassIds)
+      ? t.availableClassIds
+      : Array.isArray(t.classIds)
+        ? t.classIds
+        : []
+    const availableGrades = Array.isArray(t.availableGrades)
+      ? t.availableGrades
+      : [
+          ...new Set(
+            legacyClassIds
+              .map((id) => classes.find((c) => c.id === id)?.grade)
+              .filter(Boolean),
+          ),
+        ]
+
+    const { availableClassIds: _drop, classIds: _drop2, subjectIds: _drop3, classSubjectIds: _drop4, ...rest } = t
+    return { ...rest, subjectCatalogIds, availableGrades }
+  })
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('subjects')
   const [subjectCatalog, setSubjectCatalog] = useState([])
-  const [classSubjects, setClassSubjects] = useState([])
+  const [gradeSubjects, setGradeSubjects] = useState([])
   const [assignments, setAssignments] = useState([])
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
@@ -62,62 +102,48 @@ export default function App() {
       if (!saved) return
 
       const data = JSON.parse(saved)
-      let catalog = data.subjectCatalog || []
-      let loadedClassSubjects = data.classSubjects || []
-      let loadedAssignments = data.assignments || []
+      const loadedClasses = data.classes || []
 
-      if (loadedClassSubjects.length === 0 && (data.subjects?.length || 0) > 0) {
+      // Resolve a legacy per-class subjects array (for migration of both
+      // subject definitions and teacher subject links).
+      let legacyClassSubjects = data.classSubjects || []
+      let legacyAssignments = data.assignments || []
+      if (legacyClassSubjects.length === 0 && (data.subjects?.length || 0) > 0) {
         const migrated = migrateLegacySubjects(data.subjects)
-        loadedClassSubjects = migrated.classSubjects
+        legacyClassSubjects = migrated.classSubjects
+        legacyAssignments = migrated.assignments
+      }
+
+      // Grade subjects: prefer new shape, otherwise migrate from per-class.
+      let loadedGradeSubjects = data.gradeSubjects || []
+      let loadedAssignments = data.gradeSubjects ? data.assignments || [] : []
+      if (loadedGradeSubjects.length === 0 && legacyClassSubjects.length > 0) {
+        const migrated = migrateClassSubjectsToGrade(
+          legacyClassSubjects,
+          legacyAssignments,
+          loadedClasses,
+        )
+        loadedGradeSubjects = migrated.gradeSubjects
         loadedAssignments = migrated.assignments
       }
 
-      if (catalog.length === 0 && loadedClassSubjects.length > 0) {
-        catalog = buildCatalogFromSubjects(loadedClassSubjects)
-      } else if (catalog.length === 0 && (data.subjects?.length || 0) > 0) {
-        catalog = buildCatalogFromSubjects(data.subjects)
+      let catalog = data.subjectCatalog || []
+      if (catalog.length === 0) {
+        catalog = buildCatalogFromRows(
+          loadedGradeSubjects.length ? loadedGradeSubjects : legacyClassSubjects,
+        )
       }
 
-      const migratedTeachers = (data.teachers || []).map((t) => {
-        // Migrate subject mapping:
-        // - new: subjectCatalogIds[]
-        // - old: classSubjectIds[]/subjectIds[] (classSubject ids)
-        let subjectCatalogIds = t.subjectCatalogIds
-        if (!Array.isArray(subjectCatalogIds) || subjectCatalogIds.length === 0) {
-          const legacyClassSubjectIds = t.classSubjectIds?.length ? t.classSubjectIds : t.subjectIds || []
-          subjectCatalogIds = [
-            ...new Set(
-              (legacyClassSubjectIds || [])
-                .map((csId) => loadedClassSubjects.find((cs) => cs.id === csId)?.catalogId)
-                .filter(Boolean),
-            ),
-          ]
-        }
-
-        // Migrate availability mapping:
-        // - new: availableClassIds[] + availableGrades[]
-        // - old: classIds[]
-        const availableClassIds = Array.isArray(t.availableClassIds)
-          ? t.availableClassIds
-          : Array.isArray(t.classIds)
-            ? t.classIds
-            : []
-        const availableGrades = Array.isArray(t.availableGrades)
-          ? t.availableGrades
-          : [...new Set((availableClassIds || []).map((id) => (data.classes || []).find((c) => c.id === id)?.grade).filter(Boolean))]
-
-        return {
-          ...t,
-          subjectCatalogIds,
-          availableClassIds,
-          availableGrades,
-        }
-      })
+      const migratedTeachers = migrateTeachers(
+        data.teachers || [],
+        legacyClassSubjects,
+        loadedClasses,
+      )
 
       setSubjectCatalog(catalog)
-      setClassSubjects(loadedClassSubjects)
+      setGradeSubjects(loadedGradeSubjects)
       setAssignments(loadedAssignments)
-      setClasses(data.classes || [])
+      setClasses(loadedClasses)
       setTeachers(migratedTeachers)
       setPeriodDurationMinutes(
         Number.isFinite(parseInt(data.periodDurationMinutes, 10))
@@ -143,7 +169,7 @@ export default function App() {
   const saveData = useCallback(
     (
       catalog,
-      classSubs,
+      gradeSubs,
       assign,
       cls,
       teach,
@@ -153,21 +179,21 @@ export default function App() {
       nextWeekLength,
       nextFirstPeriodStartTime,
     ) => {
-    localStorage.setItem(
-      'timetable-data',
-      JSON.stringify({
-        subjectCatalog: catalog,
-        classSubjects: classSubs,
-        assignments: assign,
-        classes: cls,
-        teachers: teach,
-        periodDurationMinutes: periodMinutes,
-        weekStartDay: nextWeekStartDay,
-        weekLength: nextWeekLength,
-        firstPeriodStartTime: nextFirstPeriodStartTime,
-        breaks: breakList,
-      }),
-    )
+      localStorage.setItem(
+        'timetable-data',
+        JSON.stringify({
+          subjectCatalog: catalog,
+          gradeSubjects: gradeSubs,
+          assignments: assign,
+          classes: cls,
+          teachers: teach,
+          periodDurationMinutes: periodMinutes,
+          weekStartDay: nextWeekStartDay,
+          weekLength: nextWeekLength,
+          firstPeriodStartTime: nextFirstPeriodStartTime,
+          breaks: breakList,
+        }),
+      )
     },
     [],
   )
@@ -178,12 +204,17 @@ export default function App() {
       setError('Please import or add subjects, classes, and teachers before generating.')
       return
     }
-    if (classSubjects.length === 0) {
-      setError('Add at least one subject-class with weekly periods on the Subjects tab.')
+    if (gradeSubjects.length === 0) {
+      setError('Add at least one subject with weekly periods per grade on the Subjects tab.')
       return
     }
-    const unassigned = classSubjects.filter(
-      (cs) => !assignments.some((a) => a.classSubjectId === cs.id && a.teacherId),
+    const offerings = buildOfferings(gradeSubjects, classes)
+    if (offerings.length === 0) {
+      setError('No classes belong to the grades you defined subjects for. Add classes to those grades.')
+      return
+    }
+    const unassigned = offerings.filter(
+      (o) => !assignments.some((a) => a.offeringId === o.id && a.teacherId),
     )
     if (unassigned.length > 0) {
       setError('Assign a teacher to every subject-class offering before generating.')
@@ -192,7 +223,7 @@ export default function App() {
     }
     try {
       const result = generateTimetable(
-        classSubjects,
+        gradeSubjects,
         assignments,
         classes,
         teachers,
@@ -204,12 +235,12 @@ export default function App() {
     } catch (e) {
       setError(e.message)
     }
-  }, [subjectCatalog, classSubjects, assignments, classes, teachers, days])
+  }, [subjectCatalog, gradeSubjects, assignments, classes, teachers, days])
 
   const handleReset = useCallback(() => {
     if (confirm('Delete all data? This cannot be undone.')) {
       setSubjectCatalog([])
-      setClassSubjects([])
+      setGradeSubjects([])
       setAssignments([])
       setClasses([])
       setTeachers([])
@@ -230,15 +261,15 @@ export default function App() {
   const handleExcelImport = useCallback(
     ({
       subjectCatalog: catalog,
-      classSubjects: classSubs,
+      gradeSubjects: gradeSubs,
       assignments: assign,
       classes: cls,
       teachers: teach,
       breaks: importedBreaks,
     }) => {
       setSubjectCatalog(catalog)
-      setClassSubjects(classSubs)
-      setAssignments(assign)
+      setGradeSubjects(gradeSubs || [])
+      setAssignments(assign || [])
       setClasses(cls)
       setTeachers(teach)
       if (Array.isArray(importedBreaks) && importedBreaks.length > 0) {
@@ -248,8 +279,8 @@ export default function App() {
       setError('')
       saveData(
         catalog,
-        classSubs,
-        assign,
+        gradeSubs || [],
+        assign || [],
         cls,
         teach,
         periodDurationMinutes,
@@ -266,10 +297,26 @@ export default function App() {
   const handleRestoreBackup = useCallback(
     (restored) => {
       const nextCatalog = restored.subjectCatalog || []
-      const nextClassSubjects = restored.classSubjects || []
-      const nextAssignments = restored.assignments || []
       const nextClasses = restored.classes || []
-      const nextTeachers = restored.teachers || []
+
+      // Accept both new (gradeSubjects) and old (classSubjects) backups.
+      let nextGradeSubjects = restored.gradeSubjects || []
+      let nextAssignments = restored.gradeSubjects ? restored.assignments || [] : []
+      if (nextGradeSubjects.length === 0 && Array.isArray(restored.classSubjects)) {
+        const migrated = migrateClassSubjectsToGrade(
+          restored.classSubjects,
+          restored.assignments || [],
+          nextClasses,
+        )
+        nextGradeSubjects = migrated.gradeSubjects
+        nextAssignments = migrated.assignments
+      }
+
+      const nextTeachers = migrateTeachers(
+        restored.teachers || [],
+        restored.classSubjects || [],
+        nextClasses,
+      )
       const nextPeriodMinutes = Number.isFinite(parseInt(restored.periodDurationMinutes, 10))
         ? parseInt(restored.periodDurationMinutes, 10)
         : 45
@@ -291,7 +338,7 @@ export default function App() {
         Array.isArray(restored.breaks) && restored.breaks.length > 0 ? restored.breaks : breaks
 
       setSubjectCatalog(nextCatalog)
-      setClassSubjects(nextClassSubjects)
+      setGradeSubjects(nextGradeSubjects)
       setAssignments(nextAssignments)
       setClasses(nextClasses)
       setTeachers(nextTeachers)
@@ -305,7 +352,7 @@ export default function App() {
 
       saveData(
         nextCatalog,
-        nextClassSubjects,
+        nextGradeSubjects,
         nextAssignments,
         nextClasses,
         nextTeachers,
@@ -349,7 +396,7 @@ export default function App() {
             breaks={breaks}
             backupState={{
               subjectCatalog,
-              classSubjects,
+              gradeSubjects,
               assignments,
               classes,
               teachers,
@@ -370,7 +417,7 @@ export default function App() {
                 setSubjectCatalog(catalog)
                 saveData(
                   catalog,
-                  classSubjects,
+                  gradeSubjects,
                   assignments,
                   classes,
                   teachers,
@@ -381,12 +428,12 @@ export default function App() {
                   firstPeriodStartTime,
                 )
               }}
-              classSubjects={classSubjects}
-              onClassSubjectsChange={(classSubs) => {
-                setClassSubjects(classSubs)
+              gradeSubjects={gradeSubjects}
+              onGradeSubjectsChange={(gradeSubs) => {
+                setGradeSubjects(gradeSubs)
                 saveData(
                   subjectCatalog,
-                  classSubs,
+                  gradeSubs,
                   assignments,
                   classes,
                   teachers,
@@ -402,7 +449,7 @@ export default function App() {
                 setAssignments(assign)
                 saveData(
                   subjectCatalog,
-                  classSubjects,
+                  gradeSubjects,
                   assign,
                   classes,
                   teachers,
@@ -415,32 +462,17 @@ export default function App() {
               }}
               teachers={teachers}
               classes={classes}
-              onTeachersChange={(t) => {
-                setTeachers(t)
-                saveData(
-                  subjectCatalog,
-                  classSubjects,
-                  assignments,
-                  classes,
-                  t,
-                  periodDurationMinutes,
-                  breaks,
-                  weekStartDay,
-                  weekLength,
-                  firstPeriodStartTime,
-                )
-              }}
             />
           )}
           {activeTab === 'classes' && (
             <ClassForm
               classes={classes}
-              classSubjects={classSubjects}
+              gradeSubjects={gradeSubjects}
               onChange={(c) => {
                 setClasses(c)
                 saveData(
                   subjectCatalog,
-                  classSubjects,
+                  gradeSubjects,
                   assignments,
                   c,
                   teachers,
@@ -462,7 +494,7 @@ export default function App() {
                 setTeachers(t)
                 saveData(
                   subjectCatalog,
-                  classSubjects,
+                  gradeSubjects,
                   assignments,
                   classes,
                   t,
@@ -485,7 +517,7 @@ export default function App() {
                 setPeriodDurationMinutes(nextMinutes)
                 saveData(
                   subjectCatalog,
-                  classSubjects,
+                  gradeSubjects,
                   assignments,
                   classes,
                   teachers,
@@ -505,7 +537,7 @@ export default function App() {
                 if (typeof nextFirstPeriodStartTime === 'string') setFirstPeriodStartTime(nextFirstPeriodStartTime)
                 saveData(
                   subjectCatalog,
-                  classSubjects,
+                  gradeSubjects,
                   assignments,
                   classes,
                   teachers,
@@ -521,7 +553,7 @@ export default function App() {
                 setBreaks(nextBreaks)
                 saveData(
                   subjectCatalog,
-                  classSubjects,
+                  gradeSubjects,
                   assignments,
                   classes,
                   teachers,

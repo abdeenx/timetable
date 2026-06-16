@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { formatClassLabel, isDuplicateClass, classCompositeKey } from '../utils/classes'
 import RowActions from './RowActions'
 
-export default function ClassForm({ classes, classSubjects, onChange }) {
+export default function ClassForm({ classes, gradeSubjects, onChange }) {
   const [name, setName] = useState('')
   const [grade, setGrade] = useState('')
   const [editingId, setEditingId] = useState(null)
@@ -109,7 +109,7 @@ export default function ClassForm({ classes, classSubjects, onChange }) {
         </thead>
         <tbody>
           {classes.map((c) => {
-            const offerings = classSubjects.filter((s) => s.classId === c.id)
+            const offerings = (gradeSubjects || []).filter((gs) => gs.grade === c.grade)
             const totalHrs = offerings.reduce((sum, s) => sum + s.hoursPerWeek, 0)
             const isEditing = editingId === c.id
 

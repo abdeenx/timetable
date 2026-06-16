@@ -7,14 +7,12 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
   const [maxHours, setMaxHours] = useState(30)
   const [selectedSubjectCatalogIds, setSelectedSubjectCatalogIds] = useState([])
   const [selectedAvailableGrades, setSelectedAvailableGrades] = useState([])
-  const [selectedAvailableClasses, setSelectedAvailableClasses] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [editDraft, setEditDraft] = useState({
     name: '',
     maxHoursPerWeek: 30,
     subjectCatalogIds: [],
     availableGrades: [],
-    availableClassIds: [],
   })
   const [editError, setEditError] = useState('')
 
@@ -31,14 +29,12 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
         maxHoursPerWeek: parseInt(maxHours, 10) || 30,
         subjectCatalogIds: [...selectedSubjectCatalogIds],
         availableGrades: [...selectedAvailableGrades],
-        availableClassIds: [...selectedAvailableClasses],
       },
     ])
     setName('')
     setMaxHours(30)
     setSelectedSubjectCatalogIds([])
     setSelectedAvailableGrades([])
-    setSelectedAvailableClasses([])
   }
 
   const startEdit = (teacher) => {
@@ -48,7 +44,6 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
       maxHoursPerWeek: teacher.maxHoursPerWeek,
       subjectCatalogIds: [...(teacher.subjectCatalogIds || [])],
       availableGrades: [...(teacher.availableGrades || [])],
-      availableClassIds: [...(teacher.availableClassIds || teacher.classIds || [])],
     })
     setEditError('')
   }
@@ -78,7 +73,6 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
               maxHoursPerWeek: maxHoursValue,
               subjectCatalogIds: [...editDraft.subjectCatalogIds],
               availableGrades: [...editDraft.availableGrades],
-              availableClassIds: [...editDraft.availableClassIds],
             }
           : t,
       ),
@@ -110,15 +104,6 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
     }))
   }
 
-  const toggleDraftClass = (id) => {
-    setEditDraft((prev) => ({
-      ...prev,
-      availableClassIds: prev.availableClassIds.includes(id)
-        ? prev.availableClassIds.filter((x) => x !== id)
-        : [...prev.availableClassIds, id],
-    }))
-  }
-
   const toggleSubject = (id) => {
     setSelectedSubjectCatalogIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
@@ -131,19 +116,11 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
     )
   }
 
-  const toggleClass = (id) => {
-    setSelectedAvailableClasses((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    )
-  }
-
   const renderCheckboxGroups = (
     subjectCatalogIds,
     availableGrades,
-    availableClassIds,
     onSubjectToggle,
     onGradeToggle,
-    onClassToggle,
   ) => (
     <div className="checkbox-groups edit-checkbox-groups">
       <div className="checkbox-group">
@@ -174,20 +151,6 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
           </label>
         ))}
       </div>
-      <div className="checkbox-group">
-        <strong>Available classes:</strong>
-        {classes.length === 0 && <p className="dim">No classes added yet.</p>}
-        {classes.map((c) => (
-          <label key={c.id} className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={availableClassIds.includes(c.id)}
-              onChange={() => onClassToggle(c.id)}
-            />
-            {formatClassLabel(c)}
-          </label>
-        ))}
-      </div>
     </div>
   )
 
@@ -195,7 +158,7 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
     <div className="form-container">
       <h2>Teachers</h2>
       <p className="form-help">
-        Add teachers and set their limits. Click Edit on any row to update name, hours, or assignments.
+        Add teachers, set their limits, the subjects they teach, and the grades they&apos;re available for. A teacher becomes assignable wherever they teach a subject offered in a grade they&apos;re available for.
       </p>
 
       <div className="teacher-form">
@@ -224,10 +187,8 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
         {renderCheckboxGroups(
           selectedSubjectCatalogIds,
           selectedAvailableGrades,
-          selectedAvailableClasses,
           toggleSubject,
           toggleGrade,
-          toggleClass,
         )}
       </div>
 
@@ -238,7 +199,7 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
           <tr>
             <th>Teacher</th>
             <th>Teaches</th>
-            <th>Classes</th>
+            <th>Available grades</th>
             <th>Max periods/wk</th>
             <th>Actions</th>
           </tr>
@@ -249,9 +210,6 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
               .map((id) => subjectCatalog.find((s) => s.id === id)?.name)
               .filter(Boolean)
             const teacherGrades = t.availableGrades || []
-            const teacherClasses = classes.filter((c) =>
-              (t.availableClassIds || t.classIds || []).includes(c.id),
-            )
             const isEditing = editingId === t.id
 
             return (
@@ -269,11 +227,8 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
                       t.name
                     )}
                   </td>
-                  <td>
-                    {teacherSubjects.join(', ') || '—'}
-                    {teacherGrades.length > 0 ? ` (Grades: ${teacherGrades.join(', ')})` : ''}
-                  </td>
-                  <td>{teacherClasses.map((c) => formatClassLabel(c)).join(', ') || '—'}</td>
+                  <td>{teacherSubjects.join(', ') || '—'}</td>
+                  <td>{teacherGrades.join(', ') || '— (all grades)'}</td>
                   <td>
                     {isEditing ? (
                       <input
@@ -306,10 +261,8 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
                       {renderCheckboxGroups(
                         editDraft.subjectCatalogIds,
                         editDraft.availableGrades,
-                        editDraft.availableClassIds,
                         toggleDraftSubject,
                         toggleDraftGrade,
-                        toggleDraftClass,
                       )}
                     </td>
                   </tr>

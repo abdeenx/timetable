@@ -1,7 +1,50 @@
-export function classSubjectKey(catalogId, classId) {
-  return `${catalogId}:${classId}`
+export function gradeSubjectKey(catalogId, grade) {
+  return `${catalogId}:${grade}`
 }
 
+export function offeringId(gradeSubjectId, classId) {
+  return `${gradeSubjectId}:${classId}`
+}
+
+// Derive the per-class teaching offerings from grade-level subject definitions.
+// A grade subject applies to every class within that grade.
+export function buildOfferings(gradeSubjects = [], classes = []) {
+  const offerings = []
+  for (const gs of gradeSubjects) {
+    const gradeClasses = classes.filter((c) => c.grade === gs.grade)
+    for (const cls of gradeClasses) {
+      offerings.push({
+        id: offeringId(gs.id, cls.id),
+        gradeSubjectId: gs.id,
+        catalogId: gs.catalogId,
+        name: gs.name,
+        grade: gs.grade,
+        classId: cls.id,
+        hoursPerWeek: gs.hoursPerWeek,
+      })
+    }
+  }
+  return offerings
+}
+
+export function buildSchedulingUnits(gradeSubjects, classes, assignments, teachers) {
+  const offerings = buildOfferings(gradeSubjects, classes)
+  return offerings.map((o) => {
+    const teacherId = assignments.find((a) => a.offeringId === o.id)?.teacherId || null
+    return {
+      ...o,
+      teacherId,
+      teacher: teachers.find((t) => t.id === teacherId),
+    }
+  })
+}
+
+export function getClassSubjectLabel(offering, classes, formatClassLabel) {
+  const cls = classes.find((c) => c.id === offering.classId)
+  return cls ? `${offering.name} — ${formatClassLabel(cls)}` : offering.name
+}
+
+// Legacy: very old data stored a flat `subjects` array (one row per subject+class+teacher).
 export function migrateLegacySubjects(subjects = []) {
   const classSubjects = []
   const assignments = []
@@ -10,7 +53,7 @@ export function migrateLegacySubjects(subjects = []) {
   for (const row of subjects) {
     if (!row.catalogId || !row.classId) continue
 
-    const key = classSubjectKey(row.catalogId, row.classId)
+    const key = `${row.catalogId}:${row.classId}`
     let classSubjectId = classSubjectIdByKey.get(key)
 
     if (!classSubjectId) {
@@ -37,36 +80,45 @@ export function migrateLegacySubjects(subjects = []) {
   return { classSubjects, assignments }
 }
 
-export function buildSchedulingUnits(classSubjects, assignments, teachers) {
-  return classSubjects.map((cs) => ({
-    ...cs,
-    teacherId: assignments.find((a) => a.classSubjectId === cs.id)?.teacherId || null,
-    teacher: teachers.find(
-      (t) => t.id === assignments.find((a) => a.classSubjectId === cs.id)?.teacherId,
-    ),
-  }))
-}
+// Migrate per-class subject definitions to per-grade definitions.
+// Teacher assignments are remapped from classSubjectId -> offeringId (gradeSubjectId:classId).
+export function migrateClassSubjectsToGrade(classSubjects = [], assignments = [], classes = []) {
+  const classById = new Map(classes.map((c) => [c.id, c]))
+  const gradeSubjects = []
+  const gsByKey = new Map()
 
-export function syncTeacherLinks(teachers, classSubjects, assignments) {
-  return teachers.map((teacher) => {
-    const linkedClassSubjectIds = assignments
-      .filter((a) => a.teacherId === teacher.id)
-      .map((a) => a.classSubjectId)
-    const linkedClassSubjects = classSubjects.filter((cs) =>
-      linkedClassSubjectIds.includes(cs.id),
-    )
-    return {
-      ...teacher,
-      classSubjectIds: [...new Set(linkedClassSubjectIds)],
-      classIds: [...new Set(linkedClassSubjects.map((cs) => cs.classId).filter(Boolean))],
-      subjectIds: [...new Set(linkedClassSubjectIds)],
+  const gradeSubjectIdFor = (catalogId, grade) => `gs-${catalogId}-${grade}`
+
+  for (const cs of classSubjects) {
+    const grade = classById.get(cs.classId)?.grade
+    if (!grade) continue
+    const key = gradeSubjectKey(cs.catalogId, grade)
+    if (!gsByKey.has(key)) {
+      const gs = {
+        id: gradeSubjectIdFor(cs.catalogId, grade),
+        catalogId: cs.catalogId,
+        name: cs.name,
+        grade,
+        hoursPerWeek: cs.hoursPerWeek || 3,
+      }
+      gsByKey.set(key, gs)
+      gradeSubjects.push(gs)
     }
-  })
-}
+  }
 
-export function getClassSubjectLabel(classSubject, classes, formatClassLabel) {
-  const cls = classes.find((c) => c.id === classSubject.classId)
-  return cls
-    ? `${classSubject.name} — ${formatClassLabel(cls)}`
-    : classSubject.name
+  const newAssignments = []
+  for (const a of assignments) {
+    const cs = classSubjects.find((c) => c.id === a.classSubjectId)
+    if (!cs) continue
+    const grade = classById.get(cs.classId)?.grade
+    if (!grade) continue
+    const gsId = gradeSubjectIdFor(cs.catalogId, grade)
+    newAssignments.push({
+      id: a.id,
+      offeringId: offeringId(gsId, cs.classId),
+      teacherId: a.teacherId,
+    })
+  }
+
+  return { gradeSubjects, assignments: newAssignments }
 }

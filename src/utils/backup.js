@@ -6,7 +6,7 @@ const BACKUP_TYPE = 'school-timetable-generator-backup'
 
 const FIELDS = [
   'subjectCatalog',
-  'classSubjects',
+  'gradeSubjects',
   'assignments',
   'classes',
   'teachers',
@@ -16,6 +16,9 @@ const FIELDS = [
   'firstPeriodStartTime',
   'breaks',
 ]
+
+// Older backups stored per-class subjects; keep them on restore so they can be migrated.
+const LEGACY_FIELDS = ['classSubjects', 'subjects']
 
 export function buildBackup(state) {
   const payload = {}
@@ -60,7 +63,7 @@ export function parseBackup(text) {
   }
 
   const result = {}
-  for (const field of FIELDS) {
+  for (const field of [...FIELDS, ...LEGACY_FIELDS]) {
     if (data[field] !== undefined) result[field] = data[field]
   }
 

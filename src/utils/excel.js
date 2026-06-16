@@ -195,7 +195,7 @@ export function parseExcelFile(arrayBuffer) {
       classes: [],
       teachers: [],
       subjectCatalog: [],
-      classSubjects: [],
+      gradeSubjects: [],
       assignments: [],
       breaks: [],
     }
@@ -293,7 +293,7 @@ export function parseExcelFile(arrayBuffer) {
       classes: [],
       teachers: [],
       subjectCatalog: [],
-      classSubjects: [],
+      gradeSubjects: [],
       assignments: [],
       breaks: [],
     }
@@ -354,7 +354,7 @@ export function parseExcelFile(arrayBuffer) {
       classes: [],
       teachers: [],
       subjectCatalog: [],
-      classSubjects: [],
+      gradeSubjects: [],
       assignments: [],
       breaks: [],
     }
@@ -366,7 +366,7 @@ export function parseExcelFile(arrayBuffer) {
     classes,
     teachers,
     subjectCatalog,
-    classSubjects: [],
+    gradeSubjects: [],
     assignments: [],
     breaks,
   }

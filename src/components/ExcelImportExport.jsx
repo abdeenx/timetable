@@ -115,7 +115,7 @@ export default function ExcelImportExport({
 
       onImport({
         subjectCatalog: result.subjectCatalog,
-        classSubjects: result.classSubjects,
+        gradeSubjects: result.gradeSubjects,
         assignments: result.assignments,
         classes: result.classes,
         teachers: result.teachers,

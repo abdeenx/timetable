@@ -11,11 +11,11 @@
 import { formatClassLabel } from './classes'
 import { buildSchedulingUnits } from './subjects'
 
-export function generateTimetable(classSubjects, assignments, classes, teachers, days, periodsPerDay) {
+export function generateTimetable(gradeSubjects, assignments, classes, teachers, days, periodsPerDay) {
   const schedule = {}
   const teacherLoad = {}
   const warnings = []
-  const units = buildSchedulingUnits(classSubjects, assignments, teachers)
+  const units = buildSchedulingUnits(gradeSubjects, classes, assignments, teachers)
 
   for (const cls of classes) {
     const label = formatClassLabel(cls)
