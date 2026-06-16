@@ -1,4 +1,10 @@
-export default function TimetableView({ timetable, days, periods }) {
+export default function TimetableView({
+  timetable,
+  days,
+  periods,
+  periodDurationMinutes = 45,
+  onPeriodDurationMinutesChange,
+}) {
   if (!timetable) {
     return (
       <div className="form-container">
@@ -14,6 +20,26 @@ export default function TimetableView({ timetable, days, periods }) {
   return (
     <div className="form-container">
       <h2>Timetable</h2>
+
+      <div className="form-row" style={{ marginTop: 10 }}>
+        <label className="label" htmlFor="period-duration">
+          Period duration
+        </label>
+        <input
+          id="period-duration"
+          type="number"
+          min="1"
+          max="240"
+          value={periodDurationMinutes}
+          onChange={(e) => {
+            const next = parseInt(e.target.value, 10)
+            const safe = Number.isFinite(next) && next > 0 ? next : 45
+            onPeriodDurationMinutesChange?.(safe)
+          }}
+          style={{ width: '110px' }}
+        />
+        <span className="label">minutes</span>
+      </div>
       
       {warnings && warnings.length > 0 && (
         <div className="warnings">
@@ -53,7 +79,9 @@ export default function TimetableView({ timetable, days, periods }) {
               <tbody>
                 {Array.from({ length: periods }, (_, p) => (
                   <tr key={p}>
-                    <td className="period-num">Period {p + 1}</td>
+                    <td className="period-num">
+                      Period {p + 1} ({periodDurationMinutes}m)
+                    </td>
                     {days.map(d => {
                       const cell = schedule[className]?.[d]?.[p]
                       return (

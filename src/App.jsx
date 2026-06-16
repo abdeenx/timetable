@@ -34,6 +34,7 @@ export default function App() {
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
   const [timetable, setTimetable] = useState(null)
+  const [periodDurationMinutes, setPeriodDurationMinutes] = useState(45)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -69,10 +70,15 @@ export default function App() {
       setAssignments(loadedAssignments)
       setClasses(data.classes || [])
       setTeachers(syncedTeachers)
+      setPeriodDurationMinutes(
+        Number.isFinite(parseInt(data.periodDurationMinutes, 10))
+          ? parseInt(data.periodDurationMinutes, 10)
+          : 45,
+      )
     } catch {}
   }, [])
 
-  const saveData = useCallback((catalog, classSubs, assign, cls, teach) => {
+  const saveData = useCallback((catalog, classSubs, assign, cls, teach, periodMinutes) => {
     localStorage.setItem(
       'timetable-data',
       JSON.stringify({
@@ -81,6 +87,7 @@ export default function App() {
         assignments: assign,
         classes: cls,
         teachers: teach,
+        periodDurationMinutes: periodMinutes,
       }),
     )
   }, [])
@@ -127,6 +134,7 @@ export default function App() {
       setClasses([])
       setTeachers([])
       setTimetable(null)
+      setPeriodDurationMinutes(45)
       setError('')
       localStorage.removeItem('timetable-data')
     }
@@ -141,10 +149,10 @@ export default function App() {
       setTeachers(teach)
       setTimetable(null)
       setError('')
-      saveData(catalog, classSubs, assign, cls, teach)
+      saveData(catalog, classSubs, assign, cls, teach, periodDurationMinutes)
       setActiveTab('subjects')
     },
-    [saveData],
+    [saveData, periodDurationMinutes],
   )
 
   return (
@@ -181,23 +189,23 @@ export default function App() {
               subjectCatalog={subjectCatalog}
               onCatalogChange={(catalog) => {
                 setSubjectCatalog(catalog)
-                saveData(catalog, classSubjects, assignments, classes, teachers)
+                saveData(catalog, classSubjects, assignments, classes, teachers, periodDurationMinutes)
               }}
               classSubjects={classSubjects}
               onClassSubjectsChange={(classSubs) => {
                 setClassSubjects(classSubs)
-                saveData(subjectCatalog, classSubs, assignments, classes, teachers)
+                saveData(subjectCatalog, classSubs, assignments, classes, teachers, periodDurationMinutes)
               }}
               assignments={assignments}
               onAssignmentsChange={(assign) => {
                 setAssignments(assign)
-                saveData(subjectCatalog, classSubjects, assign, classes, teachers)
+                saveData(subjectCatalog, classSubjects, assign, classes, teachers, periodDurationMinutes)
               }}
               teachers={teachers}
               classes={classes}
               onTeachersChange={(t) => {
                 setTeachers(t)
-                saveData(subjectCatalog, classSubjects, assignments, classes, t)
+                saveData(subjectCatalog, classSubjects, assignments, classes, t, periodDurationMinutes)
               }}
             />
           )}
@@ -207,7 +215,7 @@ export default function App() {
               classSubjects={classSubjects}
               onChange={(c) => {
                 setClasses(c)
-                saveData(subjectCatalog, classSubjects, assignments, c, teachers)
+                saveData(subjectCatalog, classSubjects, assignments, c, teachers, periodDurationMinutes)
               }}
             />
           )}
@@ -218,12 +226,21 @@ export default function App() {
               classes={classes}
               onChange={(t) => {
                 setTeachers(t)
-                saveData(subjectCatalog, classSubjects, assignments, classes, t)
+                saveData(subjectCatalog, classSubjects, assignments, classes, t, periodDurationMinutes)
               }}
             />
           )}
           {activeTab === 'timetable' && (
-            <TimetableView timetable={timetable} days={DAYS} periods={PERIODS_PER_DAY} />
+            <TimetableView
+              timetable={timetable}
+              days={DAYS}
+              periods={PERIODS_PER_DAY}
+              periodDurationMinutes={periodDurationMinutes}
+              onPeriodDurationMinutesChange={(nextMinutes) => {
+                setPeriodDurationMinutes(nextMinutes)
+                saveData(subjectCatalog, classSubjects, assignments, classes, teachers, nextMinutes)
+              }}
+            />
           )}
         </div>
       </main>
