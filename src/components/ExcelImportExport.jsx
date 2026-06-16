@@ -125,7 +125,7 @@ export default function ExcelImportExport({
       setWarnings(result.warnings)
       setStatus({
         type: 'success',
-        message: `Imported ${result.classes.length} classes, ${result.teachers.length} teachers, and ${result.subjectCatalog.length} subjects. Set periods and assign teachers on the Subjects tab.`,
+        message: `Imported ${result.classes.length} classes, ${result.teachers.length} teachers, and ${result.subjectCatalog.length} subjects. Set lessons and assign teachers on the Subjects tab.`,
       })
     } catch {
       setStatus({
@@ -140,7 +140,7 @@ export default function ExcelImportExport({
       <h2>Excel import / export</h2>
       <p className="form-help">
         Download the template and fill in three separate lists: classes, teachers, and subject names.
-        After upload, go to the Subjects tab to set periods per class and assign teachers.
+        After upload, go to the Subjects tab to set lessons per grade and assign teachers.
       </p>
 
       <div className="excel-actions">
@@ -175,7 +175,7 @@ export default function ExcelImportExport({
       <div className="excel-backup">
         <h3>Backup &amp; migration</h3>
         <p className="form-help">
-          Export everything (classes, teachers, subjects, periods, teacher assignments, breaks, and schedule
+          Export everything (classes, teachers, subjects, lessons, teacher assignments, breaks, and schedule
           settings) into a single compact file, then restore it on another device.
         </p>
         <div className="excel-actions">

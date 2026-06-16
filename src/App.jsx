@@ -205,7 +205,7 @@ export default function App() {
       return
     }
     if (gradeSubjects.length === 0) {
-      setError('Add at least one subject with weekly periods per grade on the Subjects tab.')
+      setError('Add at least one subject with weekly lessons per grade on the Subjects tab.')
       return
     }
     const offerings = buildOfferings(gradeSubjects, classes)

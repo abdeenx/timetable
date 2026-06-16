@@ -2,10 +2,10 @@
  * Timetable generation algorithm.
  *
  * Constraints:
- * 1. A teacher can only teach one class per period
- * 2. A class can only have one subject per period
- * 3. Each subject-class offering gets its required weekly periods
- * 4. No teacher exceeds their max periods per week
+ * 1. A teacher can only teach one class per lesson
+ * 2. A class can only have one subject per lesson
+ * 3. Each subject-class offering gets its required weekly lessons
+ * 4. No teacher exceeds their max lessons per week
  */
 
 import { formatClassLabel } from './classes'
@@ -46,14 +46,14 @@ export function generateTimetable(gradeSubjects, assignments, classes, teachers,
     const totalNeeded = subjectSlots.reduce((sum, s) => sum + s.remaining, 0)
     if (totalNeeded > totalSlots) {
       warnings.push(
-        `${label}: ${totalNeeded} periods needed but only ${totalSlots} slots available (${days.length} days × ${periodsPerDay} periods). Reduce subject periods.`,
+        `${label}: ${totalNeeded} lessons needed but only ${totalSlots} slots available (${days.length} days × ${periodsPerDay} lessons). Reduce subject lessons.`,
       )
     }
     for (const subj of subjectSlots) {
       const maxWithDoublePeriods = days.length * 2
       if (subj.hoursPerWeek > maxWithDoublePeriods) {
         warnings.push(
-          `${label} - ${subj.name}: requires ${subj.hoursPerWeek} periods/week, but with a maximum of two consecutive periods per day the most you can schedule is ${maxWithDoublePeriods}.`,
+          `${label} - ${subj.name}: requires ${subj.hoursPerWeek} lessons/week, but with a maximum of two consecutive lessons per day the most you can schedule is ${maxWithDoublePeriods}.`,
         )
       }
     }
@@ -148,7 +148,7 @@ export function generateTimetable(gradeSubjects, assignments, classes, teachers,
     for (const subj of subjectSlots) {
       if (subj.remaining > 0) {
         warnings.push(
-          `${label} - ${subj.name}: could only schedule ${subj.hoursPerWeek - subj.remaining}/${subj.hoursPerWeek} periods. Check teacher availability or add more slots.`,
+          `${label} - ${subj.name}: could only schedule ${subj.hoursPerWeek - subj.remaining}/${subj.hoursPerWeek} lessons. Check teacher availability or add more slots.`,
         )
       }
     }
@@ -157,7 +157,7 @@ export function generateTimetable(gradeSubjects, assignments, classes, teachers,
   for (const t of teachers) {
     if (teacherLoad[t.id] > t.maxHoursPerWeek) {
       warnings.push(
-        `${t.name}: assigned ${teacherLoad[t.id]} periods but max is ${t.maxHoursPerWeek}.`,
+        `${t.name}: assigned ${teacherLoad[t.id]} lessons but max is ${t.maxHoursPerWeek}.`,
       )
     }
   }

@@ -148,7 +148,7 @@ export default function SubjectForm({
     }
     const hours = parseInt(gradeSubjectDraft.hoursPerWeek, 10)
     if (Number.isNaN(hours) || hours < 1) {
-      setGradeSubjectEditError('Periods must be at least 1.')
+      setGradeSubjectEditError('Lessons must be at least 1.')
       return
     }
     const duplicate = gradeSubjects.some(
@@ -227,7 +227,7 @@ export default function SubjectForm({
       <div className="form-container">
         <h2>Subject list</h2>
         <p className="form-help">
-          Subject names only — import from Excel or add here. Set weekly periods per grade below, then assign teachers per class.
+          Subject names only — import from Excel or add here. Set weekly lessons per grade below, then assign teachers per class.
         </p>
 
         <div className="form-row">
@@ -297,9 +297,9 @@ export default function SubjectForm({
       </div>
 
       <div className="form-container">
-        <h2>Periods by grade</h2>
+        <h2>Lessons by grade</h2>
         <p className="form-help">
-          Weekly periods apply to the subject across every class in that grade, independent of which teacher is assigned.
+          Weekly lessons apply to the subject across every class in that grade, independent of which teacher is assigned.
         </p>
 
         {gradeSubjectEditError && <p className="form-inline-error">{gradeSubjectEditError}</p>}
@@ -328,9 +328,9 @@ export default function SubjectForm({
             value={periodsPerWeek}
             onChange={(e) => setPeriodsPerWeek(e.target.value)}
             style={{ width: '90px' }}
-            title="Periods per week for this subject in this grade"
+            title="Lessons per week for this subject in this grade"
           />
-          <span className="label">periods/wk</span>
+          <span className="label">lessons/wk</span>
           <button
             type="button"
             className="btn-small"
@@ -342,7 +342,7 @@ export default function SubjectForm({
         </div>
 
         {gradeOptions.length === 0 && (
-          <p className="dim">Add classes (with grades) first to define periods by grade.</p>
+          <p className="dim">Add classes (with grades) first to define lessons by grade.</p>
         )}
 
         <table className="data-table assignment-table">
@@ -351,7 +351,7 @@ export default function SubjectForm({
               <th>Subject</th>
               <th>Grade</th>
               <th>Classes in grade</th>
-              <th>Periods/Week</th>
+              <th>Lessons/Week</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -438,7 +438,7 @@ export default function SubjectForm({
             {gradeSubjects.length === 0 && (
               <tr>
                 <td colSpan="5" className="empty">
-                  No subject-grade periods yet. Add a subject and grade above.
+                  No subject-grade lessons yet. Add a subject and grade above.
                 </td>
               </tr>
             )}
@@ -449,7 +449,7 @@ export default function SubjectForm({
       <div className="form-container">
         <h2>Assign teachers</h2>
         <p className="form-help">
-          Each class in a grade inherits that grade&apos;s subjects and periods. Assign a teacher per class. Only teachers who teach the subject and are available for the class/grade are listed.
+          Each class in a grade inherits that grade&apos;s subjects and lessons. Assign a teacher per class. Only teachers who teach the subject and are available for the grade are listed.
         </p>
 
         {unassignedOfferings.length > 0 && (
@@ -462,7 +462,7 @@ export default function SubjectForm({
           <thead>
             <tr>
               <th>Subject — Class</th>
-              <th>Periods/Week</th>
+              <th>Lessons/Week</th>
               <th>Teacher</th>
             </tr>
           </thead>
@@ -497,7 +497,7 @@ export default function SubjectForm({
             {offerings.length === 0 && (
               <tr>
                 <td colSpan="3" className="empty">
-                  No offerings yet. Define periods by grade above (and add classes to those grades).
+                  No offerings yet. Define lessons by grade above (and add classes to those grades).
                 </td>
               </tr>
             )}

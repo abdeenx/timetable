@@ -82,7 +82,7 @@ export default function TimetableView({
 
       <div className="form-row" style={{ marginTop: 10 }}>
         <label className="label" htmlFor="period-duration">
-          Period duration
+          Lesson duration
         </label>
         <input
           id="period-duration"
@@ -140,7 +140,7 @@ export default function TimetableView({
         />
 
         <label className="label" htmlFor="first-period-time">
-          First period
+          First lesson
         </label>
         <input
           id="first-period-time"
@@ -170,7 +170,7 @@ export default function TimetableView({
             <tr>
               <th>Label</th>
               <th>Duration (min)</th>
-              <th>Between periods</th>
+              <th>Between lessons</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -260,7 +260,7 @@ export default function TimetableView({
                     return (
                       <Fragment key={`head-p-${p}`}>
                         <th>
-                          Period {p + 1}
+                          Lesson {p + 1}
                           {timeLabel ? ` (${timeLabel})` : ''}
                         </th>
                         {breaksAfter.map((b) => (
@@ -318,7 +318,7 @@ export default function TimetableView({
 }
 
 function timetableToCSV(schedule, days, periods, breaks) {
-  let csv = 'Class,Day,Period,Subject,Teacher\n'
+  let csv = 'Class,Day,Lesson,Subject,Teacher\n'
   const byAfterPeriod = new Map()
   for (const b of breaks || []) {
     const key = parseInt(b.afterPeriod, 10)

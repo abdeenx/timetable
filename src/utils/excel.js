@@ -12,9 +12,9 @@ const SHEET = {
 }
 
 const CLASS_HEADERS = ['Class Name', 'Grade/Year']
-const TEACHER_HEADERS = ['Teacher Name', 'Max Periods/Week']
+const TEACHER_HEADERS = ['Teacher Name', 'Max Lessons/Week']
 const SUBJECT_HEADERS = ['Subject Name']
-const BREAK_HEADERS = ['Break Label', 'Duration (Minutes)', 'Between Periods']
+const BREAK_HEADERS = ['Break Label', 'Duration (Minutes)', 'Between Lessons']
 
 const TEMPLATE_CLASSES = [
   { 'Class Name': 'A', 'Grade/Year': 'Grade 10' },
@@ -23,8 +23,8 @@ const TEMPLATE_CLASSES = [
 ]
 
 const TEMPLATE_TEACHERS = [
-  { 'Teacher Name': 'Jane Smith', 'Max Periods/Week': 30 },
-  { 'Teacher Name': 'John Doe', 'Max Periods/Week': 25 },
+  { 'Teacher Name': 'Jane Smith', 'Max Lessons/Week': 30 },
+  { 'Teacher Name': 'John Doe', 'Max Lessons/Week': 25 },
 ]
 
 const TEMPLATE_SUBJECTS = [
@@ -34,8 +34,8 @@ const TEMPLATE_SUBJECTS = [
 ]
 
 const TEMPLATE_BREAKS = [
-  { 'Break Label': 'Lunch', 'Duration (Minutes)': 30, 'Between Periods': '2-3' },
-  { 'Break Label': 'Break', 'Duration (Minutes)': 15, 'Between Periods': '6-7' },
+  { 'Break Label': 'Lunch', 'Duration (Minutes)': 30, 'Between Lessons': '2-3' },
+  { 'Break Label': 'Break', 'Duration (Minutes)': 15, 'Between Lessons': '6-7' },
 ]
 
 const INSTRUCTIONS = [
@@ -43,7 +43,7 @@ const INSTRUCTIONS = [
   [],
   ['Each sheet is a simple list. Do not repeat names across sheets.'],
   [
-    'After import, use the Subjects tab in the app to set periods per class and assign teachers.',
+    'After import, use the Subjects tab in the app to set lessons per grade and assign teachers.',
   ],
   [],
   ['Classes sheet'],
@@ -52,7 +52,7 @@ const INSTRUCTIONS = [
   [],
   ['Teachers sheet'],
   ['  • Teacher Name — required'],
-  ['  • Max Periods/Week — required number (defaults to 30 if empty)'],
+  ['  • Max Lessons/Week — required number (defaults to 30 if empty)'],
   [],
   ['Subjects sheet'],
   ['  • Subject Name — required (e.g. Mathematics, English)'],
@@ -61,11 +61,11 @@ const INSTRUCTIONS = [
   ['Breaks sheet (optional)'],
   ['  • Break Label — required (e.g. Lunch, Break)'],
   ['  • Duration (Minutes) — required number (e.g. 15, 30)'],
-  ['  • Between Periods — required format "2-3" meaning between period 2 and 3'],
+  ['  • Between Lessons — required format "2-3" meaning between lesson 2 and 3'],
   [],
   ['Tips'],
   ['  • Keep sheet names unchanged (Classes, Teachers, Subjects, Breaks).'],
-  ['  • Set periods per class and assign teachers in the web app after upload.'],
+  ['  • Set lessons per grade and assign teachers in the web app after upload.'],
 ]
 
 let idCounter = 0
@@ -149,7 +149,7 @@ export function downloadCurrentData(classes, teachers, subjectCatalog, breaks = 
 
   const teacherRows = teachers.map((t) => ({
     'Teacher Name': t.name,
-    'Max Periods/Week': t.maxHoursPerWeek,
+    'Max Lessons/Week': t.maxHoursPerWeek,
   }))
 
   const subjectRows = subjectCatalog.map((s) => ({
@@ -159,7 +159,7 @@ export function downloadCurrentData(classes, teachers, subjectCatalog, breaks = 
   const breakRows = (breaks || []).map((b) => ({
     'Break Label': b.label,
     'Duration (Minutes)': b.durationMinutes,
-    'Between Periods': `${b.afterPeriod}-${b.afterPeriod + 1}`,
+    'Between Lessons': `${b.afterPeriod}-${b.afterPeriod + 1}`,
   }))
 
   const wb = buildWorkbook({
@@ -237,6 +237,8 @@ export function parseExcelFile(arrayBuffer) {
     seenTeacherNames.add(key)
     const maxRaw = getCell(
       row,
+      'Max Lessons/Week',
+      'Max Lessons',
       'Max Periods/Week',
       'Max Hours/Week',
       'Max Periods',
@@ -245,7 +247,7 @@ export function parseExcelFile(arrayBuffer) {
     )
     const maxHours = maxRaw === '' ? 30 : parseInt(maxRaw, 10)
     if (Number.isNaN(maxHours) || maxHours < 1) {
-      errors.push(`Teachers row ${rowNum}: invalid max periods for "${name}".`)
+      errors.push(`Teachers row ${rowNum}: invalid max lessons for "${name}".`)
       return
     }
 
@@ -326,14 +328,21 @@ export function parseExcelFile(arrayBuffer) {
         return
       }
 
-      const betweenRaw = getCell(row, 'Between Periods', 'Between', 'After Period')
+      const betweenRaw = getCell(
+        row,
+        'Between Lessons',
+        'Between Periods',
+        'Between',
+        'After Lesson',
+        'After Period',
+      )
       const afterPeriod = parseBetween(betweenRaw)
       if (!afterPeriod) {
-        errors.push(`Breaks row ${rowNum}: invalid "Between Periods" value for "${label}". Use "2-3".`)
+        errors.push(`Breaks row ${rowNum}: invalid "Between Lessons" value for "${label}". Use "2-3".`)
         return
       }
       if (seenAfterPeriods.has(afterPeriod)) {
-        warnings.push(`Breaks row ${rowNum}: duplicate break placement after period ${afterPeriod} skipped.`)
+        warnings.push(`Breaks row ${rowNum}: duplicate break placement after lesson ${afterPeriod} skipped.`)
         return
       }
       seenAfterPeriods.add(afterPeriod)

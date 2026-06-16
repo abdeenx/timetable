@@ -176,9 +176,9 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
             value={maxHours}
             onChange={(e) => setMaxHours(e.target.value)}
             style={{ width: '100px' }}
-            title="Max periods per week"
+            title="Max lessons per week"
           />
-          <span className="label">max periods/wk</span>
+          <span className="label">max lessons/wk</span>
           <button type="button" className="btn-small" onClick={addTeacher}>
             Add
           </button>
@@ -200,7 +200,7 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
             <th>Teacher</th>
             <th>Teaches</th>
             <th>Available grades</th>
-            <th>Max periods/wk</th>
+            <th>Max lessons/wk</th>
             <th>Actions</th>
           </tr>
         </thead>

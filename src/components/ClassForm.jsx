@@ -103,7 +103,7 @@ export default function ClassForm({ classes, gradeSubjects, onChange }) {
             <th>Class</th>
             <th>Grade/Year</th>
             <th>Subjects</th>
-            <th>Total periods/wk</th>
+            <th>Total lessons/wk</th>
             <th>Actions</th>
           </tr>
         </thead>
