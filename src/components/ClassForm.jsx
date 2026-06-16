@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatClassLabel, isDuplicateClass, classCompositeKey } from '../utils/classes'
+import { formatClassLabel, isDuplicateClass, classCompositeKey, sortClasses } from '../utils/classes'
 import RowActions from './RowActions'
 
 export default function ClassForm({ classes, gradeSubjects, onChange }) {
@@ -108,7 +108,7 @@ export default function ClassForm({ classes, gradeSubjects, onChange }) {
           </tr>
         </thead>
         <tbody>
-          {classes.map((c) => {
+          {sortClasses(classes).map((c) => {
             const offerings = (gradeSubjects || []).filter((gs) => gs.grade === c.grade)
             const totalHrs = offerings.reduce((sum, s) => sum + s.hoursPerWeek, 0)
             const isEditing = editingId === c.id

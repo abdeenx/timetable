@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { formatClassLabel } from '../utils/classes'
+import { naturalCompare } from '../utils/classes'
 import RowActions from './RowActions'
 
 export default function TeacherForm({ teachers, subjectCatalog, classes, onChange }) {
@@ -16,7 +16,7 @@ export default function TeacherForm({ teachers, subjectCatalog, classes, onChang
   })
   const [editError, setEditError] = useState('')
 
-  const gradeOptions = [...new Set(classes.map((c) => c.grade).filter(Boolean))].sort()
+  const gradeOptions = [...new Set(classes.map((c) => c.grade).filter(Boolean))].sort(naturalCompare)
   const subjectOptions = (subjectCatalog || []).map((s) => ({ id: s.id, name: s.name }))
 
   const addTeacher = () => {

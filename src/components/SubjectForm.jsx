@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatClassLabel } from '../utils/classes'
+import { formatClassLabel, sortClasses, naturalCompare } from '../utils/classes'
 import {
   gradeSubjectKey,
   buildOfferings,
@@ -32,7 +32,7 @@ export default function SubjectForm({
   })
   const [gradeSubjectEditError, setGradeSubjectEditError] = useState('')
 
-  const gradeOptions = [...new Set(classes.map((c) => c.grade).filter(Boolean))].sort()
+  const gradeOptions = [...new Set(classes.map((c) => c.grade).filter(Boolean))].sort(naturalCompare)
 
   const addToCatalog = () => {
     const name = catalogName.trim()
@@ -217,7 +217,7 @@ export default function SubjectForm({
     onAssignmentsChange(nextAssignments)
   }
 
-  const offerings = buildOfferings(gradeSubjects, classes)
+  const offerings = buildOfferings(gradeSubjects, sortClasses(classes))
   const unassignedOfferings = offerings.filter(
     (o) => !assignments.some((a) => a.offeringId === o.id && a.teacherId),
   )
@@ -358,7 +358,7 @@ export default function SubjectForm({
           <tbody>
             {gradeSubjects.map((gs) => {
               const isEditing = editingGradeSubjectId === gs.id
-              const classesInGrade = classes.filter((c) => c.grade === gs.grade)
+              const classesInGrade = sortClasses(classes.filter((c) => c.grade === gs.grade))
               return (
                 <tr key={gs.id}>
                   <td>

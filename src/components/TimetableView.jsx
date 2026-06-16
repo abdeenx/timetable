@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import { fileTimestamp } from '../utils/datetime'
 import { safeFilename } from '../utils/filenames'
+import { naturalCompare } from '../utils/classes'
 
 export default function TimetableView({
   timetable,
@@ -243,7 +244,7 @@ export default function TimetableView({
         </button>
       </div>
 
-      {Object.keys(schedule).sort().map(className => (
+      {Object.keys(schedule).sort(naturalCompare).map(className => (
         <div key={className} className="class-timetable">
           <h3>{className}</h3>
           <div className="table-scroll">
