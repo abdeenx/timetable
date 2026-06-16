@@ -373,6 +373,16 @@ body {
 .cell-subject { font-weight: 600; font-size: 12px; }
 .cell-teacher { font-size: 10px; color: var(--text-dim); }
 
+.break-row .break-cell {
+  background: #dcfce7; /* green-100 */
+  border-color: #86efac; /* green-300 */
+  color: #065f46; /* green-800 */
+  font-weight: 600;
+}
+.break-row .break-label {
+  background: #bbf7d0; /* green-200 */
+}
+
 .class-timetable { margin-bottom: 32px; }
 .class-timetable h3 {
   background: var(--primary);

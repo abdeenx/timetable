@@ -10,6 +10,7 @@ export default function ExcelImportExport({
   classes,
   teachers,
   subjectCatalog,
+  breaks,
   onImport,
   onError,
 }) {
@@ -26,7 +27,7 @@ export default function ExcelImportExport({
   }
 
   const handleDownloadData = () => {
-    downloadCurrentData(classes, teachers, subjectCatalog)
+    downloadCurrentData(classes, teachers, subjectCatalog, breaks)
     setStatus({ type: 'success', message: 'Lists exported to Excel. Assignments stay in the app.' })
   }
 
@@ -69,6 +70,7 @@ export default function ExcelImportExport({
         assignments: result.assignments,
         classes: result.classes,
         teachers: result.teachers,
+        breaks: result.breaks,
       })
 
       setWarnings(result.warnings)

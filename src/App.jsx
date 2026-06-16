@@ -35,6 +35,10 @@ export default function App() {
   const [teachers, setTeachers] = useState([])
   const [timetable, setTimetable] = useState(null)
   const [periodDurationMinutes, setPeriodDurationMinutes] = useState(45)
+  const [breaks, setBreaks] = useState([
+    { id: 'default-1', label: 'Lunch', durationMinutes: 30, afterPeriod: 2 },
+    { id: 'default-2', label: 'Break', durationMinutes: 15, afterPeriod: 6 },
+  ])
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -75,10 +79,13 @@ export default function App() {
           ? parseInt(data.periodDurationMinutes, 10)
           : 45,
       )
+      if (Array.isArray(data.breaks) && data.breaks.length > 0) {
+        setBreaks(data.breaks)
+      }
     } catch {}
   }, [])
 
-  const saveData = useCallback((catalog, classSubs, assign, cls, teach, periodMinutes) => {
+  const saveData = useCallback((catalog, classSubs, assign, cls, teach, periodMinutes, breakList) => {
     localStorage.setItem(
       'timetable-data',
       JSON.stringify({
@@ -88,6 +95,7 @@ export default function App() {
         classes: cls,
         teachers: teach,
         periodDurationMinutes: periodMinutes,
+        breaks: breakList,
       }),
     )
   }, [])
@@ -135,24 +143,38 @@ export default function App() {
       setTeachers([])
       setTimetable(null)
       setPeriodDurationMinutes(45)
+      setBreaks([
+        { id: 'default-1', label: 'Lunch', durationMinutes: 30, afterPeriod: 2 },
+        { id: 'default-2', label: 'Break', durationMinutes: 15, afterPeriod: 6 },
+      ])
       setError('')
       localStorage.removeItem('timetable-data')
     }
   }, [])
 
   const handleExcelImport = useCallback(
-    ({ subjectCatalog: catalog, classSubjects: classSubs, assignments: assign, classes: cls, teachers: teach }) => {
+    ({
+      subjectCatalog: catalog,
+      classSubjects: classSubs,
+      assignments: assign,
+      classes: cls,
+      teachers: teach,
+      breaks: importedBreaks,
+    }) => {
       setSubjectCatalog(catalog)
       setClassSubjects(classSubs)
       setAssignments(assign)
       setClasses(cls)
       setTeachers(teach)
+      if (Array.isArray(importedBreaks) && importedBreaks.length > 0) {
+        setBreaks(importedBreaks)
+      }
       setTimetable(null)
       setError('')
-      saveData(catalog, classSubs, assign, cls, teach, periodDurationMinutes)
+      saveData(catalog, classSubs, assign, cls, teach, periodDurationMinutes, importedBreaks || breaks)
       setActiveTab('subjects')
     },
-    [saveData, periodDurationMinutes],
+    [saveData, periodDurationMinutes, breaks],
   )
 
   return (
@@ -181,6 +203,7 @@ export default function App() {
             classes={classes}
             teachers={teachers}
             subjectCatalog={subjectCatalog}
+            breaks={breaks}
             onImport={handleExcelImport}
             onError={setError}
           />
@@ -189,23 +212,55 @@ export default function App() {
               subjectCatalog={subjectCatalog}
               onCatalogChange={(catalog) => {
                 setSubjectCatalog(catalog)
-                saveData(catalog, classSubjects, assignments, classes, teachers, periodDurationMinutes)
+                saveData(
+                  catalog,
+                  classSubjects,
+                  assignments,
+                  classes,
+                  teachers,
+                  periodDurationMinutes,
+                  breaks,
+                )
               }}
               classSubjects={classSubjects}
               onClassSubjectsChange={(classSubs) => {
                 setClassSubjects(classSubs)
-                saveData(subjectCatalog, classSubs, assignments, classes, teachers, periodDurationMinutes)
+                saveData(
+                  subjectCatalog,
+                  classSubs,
+                  assignments,
+                  classes,
+                  teachers,
+                  periodDurationMinutes,
+                  breaks,
+                )
               }}
               assignments={assignments}
               onAssignmentsChange={(assign) => {
                 setAssignments(assign)
-                saveData(subjectCatalog, classSubjects, assign, classes, teachers, periodDurationMinutes)
+                saveData(
+                  subjectCatalog,
+                  classSubjects,
+                  assign,
+                  classes,
+                  teachers,
+                  periodDurationMinutes,
+                  breaks,
+                )
               }}
               teachers={teachers}
               classes={classes}
               onTeachersChange={(t) => {
                 setTeachers(t)
-                saveData(subjectCatalog, classSubjects, assignments, classes, t, periodDurationMinutes)
+                saveData(
+                  subjectCatalog,
+                  classSubjects,
+                  assignments,
+                  classes,
+                  t,
+                  periodDurationMinutes,
+                  breaks,
+                )
               }}
             />
           )}
@@ -215,7 +270,15 @@ export default function App() {
               classSubjects={classSubjects}
               onChange={(c) => {
                 setClasses(c)
-                saveData(subjectCatalog, classSubjects, assignments, c, teachers, periodDurationMinutes)
+                saveData(
+                  subjectCatalog,
+                  classSubjects,
+                  assignments,
+                  c,
+                  teachers,
+                  periodDurationMinutes,
+                  breaks,
+                )
               }}
             />
           )}
@@ -226,7 +289,15 @@ export default function App() {
               classes={classes}
               onChange={(t) => {
                 setTeachers(t)
-                saveData(subjectCatalog, classSubjects, assignments, classes, t, periodDurationMinutes)
+                saveData(
+                  subjectCatalog,
+                  classSubjects,
+                  assignments,
+                  classes,
+                  t,
+                  periodDurationMinutes,
+                  breaks,
+                )
               }}
             />
           )}
@@ -238,7 +309,20 @@ export default function App() {
               periodDurationMinutes={periodDurationMinutes}
               onPeriodDurationMinutesChange={(nextMinutes) => {
                 setPeriodDurationMinutes(nextMinutes)
-                saveData(subjectCatalog, classSubjects, assignments, classes, teachers, nextMinutes)
+                saveData(subjectCatalog, classSubjects, assignments, classes, teachers, nextMinutes, breaks)
+              }}
+              breaks={breaks}
+              onBreaksChange={(nextBreaks) => {
+                setBreaks(nextBreaks)
+                saveData(
+                  subjectCatalog,
+                  classSubjects,
+                  assignments,
+                  classes,
+                  teachers,
+                  periodDurationMinutes,
+                  nextBreaks,
+                )
               }}
             />
           )}
