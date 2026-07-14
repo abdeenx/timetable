@@ -217,7 +217,7 @@ export default function App() {
       (o) => !assignments.some((a) => a.offeringId === o.id && a.teacherId),
     )
     if (unassigned.length > 0) {
-      setError('Assign a teacher to every subject-class offering before generating.')
+      setError('Assign a teacher to every subject/class offering before generating.')
       setActiveTab('subjects')
       return
     }
