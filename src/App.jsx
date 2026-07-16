@@ -3,6 +3,7 @@ import SubjectForm from './components/SubjectForm'
 import ClassForm from './components/ClassForm'
 import TeacherForm from './components/TeacherForm'
 import TimetableView from './components/TimetableView'
+import SiteSettings from './components/SiteSettings'
 import Sidebar from './components/Sidebar'
 import InstallPrompt from './components/InstallPrompt'
 import ExcelImportExport from './components/ExcelImportExport'
@@ -14,7 +15,8 @@ import {
 } from './utils/subjects'
 import './App.css'
 
-const PERIODS_PER_DAY = 8
+const DEFAULT_PERIODS_PER_DAY = 8
+const MAX_PERIODS_PER_DAY = 16
 const WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 function buildDays(weekStartDay, weekLength) {
@@ -25,6 +27,33 @@ function buildDays(weekStartDay, weekLength) {
     days.push(WEEK_DAYS[(startIndex + i) % WEEK_DAYS.length])
   }
   return days
+}
+
+function sanitizePeriodsPerDay(value) {
+  const parsed = parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed >= 1 && parsed <= MAX_PERIODS_PER_DAY
+    ? parsed
+    : DEFAULT_PERIODS_PER_DAY
+}
+
+function sanitizeFixedSlots(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter(
+      (f) =>
+        f &&
+        typeof f === 'object' &&
+        WEEK_DAYS.includes(f.day) &&
+        Number.isFinite(parseInt(f.period, 10)) &&
+        f.catalogId,
+    )
+    .map((f) => ({
+      id: String(f.id || `${f.day}-${f.period}-${f.catalogId}`),
+      day: f.day,
+      period: Math.min(MAX_PERIODS_PER_DAY, Math.max(1, parseInt(f.period, 10))),
+      catalogId: f.catalogId,
+      teacherId: typeof f.teacherId === 'string' && f.teacherId ? f.teacherId : null,
+    }))
 }
 
 function buildCatalogFromRows(rows) {
@@ -92,6 +121,8 @@ export default function App() {
     { id: 'default-1', label: 'Lunch', durationMinutes: 30, afterPeriod: 2 },
     { id: 'default-2', label: 'Break', durationMinutes: 15, afterPeriod: 6 },
   ])
+  const [periodsPerDay, setPeriodsPerDay] = useState(DEFAULT_PERIODS_PER_DAY)
+  const [fixedSlots, setFixedSlots] = useState([])
   const [error, setError] = useState('')
 
   const days = buildDays(weekStartDay, weekLength)
@@ -163,39 +194,48 @@ export default function App() {
       if (Array.isArray(data.breaks) && data.breaks.length > 0) {
         setBreaks(data.breaks)
       }
+      if (data.periodsPerDay !== undefined) {
+        setPeriodsPerDay(sanitizePeriodsPerDay(data.periodsPerDay))
+      }
+      setFixedSlots(sanitizeFixedSlots(data.fixedSlots))
     } catch {}
   }, [])
 
   const saveData = useCallback(
-    (
-      catalog,
-      gradeSubs,
-      assign,
-      cls,
-      teach,
-      periodMinutes,
-      breakList,
-      nextWeekStartDay,
-      nextWeekLength,
-      nextFirstPeriodStartTime,
-    ) => {
+    (overrides = {}) => {
       localStorage.setItem(
         'timetable-data',
         JSON.stringify({
-          subjectCatalog: catalog,
-          gradeSubjects: gradeSubs,
-          assignments: assign,
-          classes: cls,
-          teachers: teach,
-          periodDurationMinutes: periodMinutes,
-          weekStartDay: nextWeekStartDay,
-          weekLength: nextWeekLength,
-          firstPeriodStartTime: nextFirstPeriodStartTime,
-          breaks: breakList,
+          subjectCatalog,
+          gradeSubjects,
+          assignments,
+          classes,
+          teachers,
+          periodDurationMinutes,
+          weekStartDay,
+          weekLength,
+          firstPeriodStartTime,
+          breaks,
+          periodsPerDay,
+          fixedSlots,
+          ...overrides,
         }),
       )
     },
-    [],
+    [
+      subjectCatalog,
+      gradeSubjects,
+      assignments,
+      classes,
+      teachers,
+      periodDurationMinutes,
+      weekStartDay,
+      weekLength,
+      firstPeriodStartTime,
+      breaks,
+      periodsPerDay,
+      fixedSlots,
+    ],
   )
 
   const handleGenerate = useCallback(() => {
@@ -228,14 +268,15 @@ export default function App() {
         classes,
         teachers,
         days,
-        PERIODS_PER_DAY,
+        periodsPerDay,
+        fixedSlots,
       )
       setTimetable(result)
       setActiveTab('timetable')
     } catch (e) {
       setError(e.message)
     }
-  }, [subjectCatalog, gradeSubjects, assignments, classes, teachers, days])
+  }, [subjectCatalog, gradeSubjects, assignments, classes, teachers, days, periodsPerDay, fixedSlots])
 
   const handleReset = useCallback(() => {
     if (confirm('Delete all data? This cannot be undone.')) {
@@ -253,6 +294,8 @@ export default function App() {
         { id: 'default-1', label: 'Lunch', durationMinutes: 30, afterPeriod: 2 },
         { id: 'default-2', label: 'Break', durationMinutes: 15, afterPeriod: 6 },
       ])
+      setPeriodsPerDay(DEFAULT_PERIODS_PER_DAY)
+      setFixedSlots([])
       setError('')
       localStorage.removeItem('timetable-data')
     }
@@ -277,21 +320,17 @@ export default function App() {
       }
       setTimetable(null)
       setError('')
-      saveData(
-        catalog,
-        gradeSubs || [],
-        assign || [],
-        cls,
-        teach,
-        periodDurationMinutes,
-        importedBreaks || breaks,
-        weekStartDay,
-        weekLength,
-        firstPeriodStartTime,
-      )
+      saveData({
+        subjectCatalog: catalog,
+        gradeSubjects: gradeSubs || [],
+        assignments: assign || [],
+        classes: cls,
+        teachers: teach,
+        breaks: importedBreaks || breaks,
+      })
       setActiveTab('subjects')
     },
-    [saveData, periodDurationMinutes, breaks, weekStartDay, weekLength, firstPeriodStartTime],
+    [saveData, breaks],
   )
 
   const handleRestoreBackup = useCallback(
@@ -336,6 +375,12 @@ export default function App() {
           : '08:00'
       const nextBreaks =
         Array.isArray(restored.breaks) && restored.breaks.length > 0 ? restored.breaks : breaks
+      const nextPeriodsPerDay =
+        restored.periodsPerDay !== undefined
+          ? sanitizePeriodsPerDay(restored.periodsPerDay)
+          : periodsPerDay
+      const nextFixedSlots =
+        restored.fixedSlots !== undefined ? sanitizeFixedSlots(restored.fixedSlots) : fixedSlots
 
       setSubjectCatalog(nextCatalog)
       setGradeSubjects(nextGradeSubjects)
@@ -347,24 +392,28 @@ export default function App() {
       setWeekLength(nextWeekLength)
       setFirstPeriodStartTime(nextFirstPeriodStartTime)
       setBreaks(nextBreaks)
+      setPeriodsPerDay(nextPeriodsPerDay)
+      setFixedSlots(nextFixedSlots)
       setTimetable(null)
       setError('')
 
-      saveData(
-        nextCatalog,
-        nextGradeSubjects,
-        nextAssignments,
-        nextClasses,
-        nextTeachers,
-        nextPeriodMinutes,
-        nextBreaks,
-        nextWeekStartDay,
-        nextWeekLength,
-        nextFirstPeriodStartTime,
-      )
+      saveData({
+        subjectCatalog: nextCatalog,
+        gradeSubjects: nextGradeSubjects,
+        assignments: nextAssignments,
+        classes: nextClasses,
+        teachers: nextTeachers,
+        periodDurationMinutes: nextPeriodMinutes,
+        weekStartDay: nextWeekStartDay,
+        weekLength: nextWeekLength,
+        firstPeriodStartTime: nextFirstPeriodStartTime,
+        breaks: nextBreaks,
+        periodsPerDay: nextPeriodsPerDay,
+        fixedSlots: nextFixedSlots,
+      })
       setActiveTab('subjects')
     },
-    [saveData, breaks],
+    [saveData, breaks, periodsPerDay, fixedSlots],
   )
 
   return (
@@ -405,6 +454,8 @@ export default function App() {
               weekLength,
               firstPeriodStartTime,
               breaks,
+              periodsPerDay,
+              fixedSlots,
             }}
             onImport={handleExcelImport}
             onRestore={handleRestoreBackup}
@@ -415,50 +466,17 @@ export default function App() {
               subjectCatalog={subjectCatalog}
               onCatalogChange={(catalog) => {
                 setSubjectCatalog(catalog)
-                saveData(
-                  catalog,
-                  gradeSubjects,
-                  assignments,
-                  classes,
-                  teachers,
-                  periodDurationMinutes,
-                  breaks,
-                  weekStartDay,
-                  weekLength,
-                  firstPeriodStartTime,
-                )
+                saveData({ subjectCatalog: catalog })
               }}
               gradeSubjects={gradeSubjects}
               onGradeSubjectsChange={(gradeSubs) => {
                 setGradeSubjects(gradeSubs)
-                saveData(
-                  subjectCatalog,
-                  gradeSubs,
-                  assignments,
-                  classes,
-                  teachers,
-                  periodDurationMinutes,
-                  breaks,
-                  weekStartDay,
-                  weekLength,
-                  firstPeriodStartTime,
-                )
+                saveData({ gradeSubjects: gradeSubs })
               }}
               assignments={assignments}
               onAssignmentsChange={(assign) => {
                 setAssignments(assign)
-                saveData(
-                  subjectCatalog,
-                  gradeSubjects,
-                  assign,
-                  classes,
-                  teachers,
-                  periodDurationMinutes,
-                  breaks,
-                  weekStartDay,
-                  weekLength,
-                  firstPeriodStartTime,
-                )
+                saveData({ assignments: assign })
               }}
               teachers={teachers}
               classes={classes}
@@ -470,18 +488,7 @@ export default function App() {
               gradeSubjects={gradeSubjects}
               onChange={(c) => {
                 setClasses(c)
-                saveData(
-                  subjectCatalog,
-                  gradeSubjects,
-                  assignments,
-                  c,
-                  teachers,
-                  periodDurationMinutes,
-                  breaks,
-                  weekStartDay,
-                  weekLength,
-                  firstPeriodStartTime,
-                )
+                saveData({ classes: c })
               }}
             />
           )}
@@ -492,18 +499,7 @@ export default function App() {
               classes={classes}
               onChange={(t) => {
                 setTeachers(t)
-                saveData(
-                  subjectCatalog,
-                  gradeSubjects,
-                  assignments,
-                  classes,
-                  t,
-                  periodDurationMinutes,
-                  breaks,
-                  weekStartDay,
-                  weekLength,
-                  firstPeriodStartTime,
-                )
+                saveData({ teachers: t })
               }}
             />
           )}
@@ -511,22 +507,11 @@ export default function App() {
             <TimetableView
               timetable={timetable}
               days={days}
-              periods={PERIODS_PER_DAY}
+              periods={periodsPerDay}
               periodDurationMinutes={periodDurationMinutes}
               onPeriodDurationMinutesChange={(nextMinutes) => {
                 setPeriodDurationMinutes(nextMinutes)
-                saveData(
-                  subjectCatalog,
-                  gradeSubjects,
-                  assignments,
-                  classes,
-                  teachers,
-                  nextMinutes,
-                  breaks,
-                  weekStartDay,
-                  weekLength,
-                  firstPeriodStartTime,
-                )
+                saveData({ periodDurationMinutes: nextMinutes })
               }}
               weekStartDay={weekStartDay}
               weekLength={weekLength}
@@ -535,35 +520,34 @@ export default function App() {
                 if (nextWeekStartDay) setWeekStartDay(nextWeekStartDay)
                 if (typeof nextWeekLength === 'number') setWeekLength(nextWeekLength)
                 if (typeof nextFirstPeriodStartTime === 'string') setFirstPeriodStartTime(nextFirstPeriodStartTime)
-                saveData(
-                  subjectCatalog,
-                  gradeSubjects,
-                  assignments,
-                  classes,
-                  teachers,
-                  periodDurationMinutes,
-                  breaks,
-                  nextWeekStartDay ?? weekStartDay,
-                  nextWeekLength ?? weekLength,
-                  nextFirstPeriodStartTime ?? firstPeriodStartTime,
-                )
+                saveData({
+                  weekStartDay: nextWeekStartDay ?? weekStartDay,
+                  weekLength: nextWeekLength ?? weekLength,
+                  firstPeriodStartTime: nextFirstPeriodStartTime ?? firstPeriodStartTime,
+                })
               }}
               breaks={breaks}
               onBreaksChange={(nextBreaks) => {
                 setBreaks(nextBreaks)
-                saveData(
-                  subjectCatalog,
-                  gradeSubjects,
-                  assignments,
-                  classes,
-                  teachers,
-                  periodDurationMinutes,
-                  nextBreaks,
-                  weekStartDay,
-                  weekLength,
-                  firstPeriodStartTime,
-                )
+                saveData({ breaks: nextBreaks })
               }}
+            />
+          )}
+          {activeTab === 'settings' && (
+            <SiteSettings
+              periodsPerDay={periodsPerDay}
+              onPeriodsPerDayChange={(next) => {
+                setPeriodsPerDay(next)
+                saveData({ periodsPerDay: next })
+              }}
+              fixedSlots={fixedSlots}
+              onFixedSlotsChange={(next) => {
+                setFixedSlots(next)
+                saveData({ fixedSlots: next })
+              }}
+              subjectCatalog={subjectCatalog}
+              teachers={teachers}
+              days={days}
             />
           )}
         </div>

@@ -4,6 +4,7 @@ export default function Sidebar({ activeTab, onTabChange }) {
     { id: 'classes', label: '🏫 Classes', icon: '🏫' },
     { id: 'teachers', label: '👩‍🏫 Teachers', icon: '👩‍🏫' },
     { id: 'timetable', label: '📅 Timetable', icon: '📅' },
+    { id: 'settings', label: '⚙️ Site Settings', icon: '⚙️' },
   ]
 
   return (

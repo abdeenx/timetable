@@ -11,11 +11,30 @@
 import { formatClassLabel } from './classes'
 import { buildSchedulingUnits } from './subjects'
 
-export function generateTimetable(gradeSubjects, assignments, classes, teachers, days, periodsPerDay) {
+export function generateTimetable(
+  gradeSubjects,
+  assignments,
+  classes,
+  teachers,
+  days,
+  periodsPerDay,
+  fixedSlots = [],
+) {
   const schedule = {}
   const teacherLoad = {}
   const warnings = []
   const units = buildSchedulingUnits(gradeSubjects, classes, assignments, teachers)
+
+  const fixedRules = (fixedSlots || []).filter((f) => {
+    const period = parseInt(f.period, 10)
+    return (
+      f.catalogId &&
+      days.includes(f.day) &&
+      Number.isFinite(period) &&
+      period >= 1 &&
+      period <= periodsPerDay
+    )
+  })
 
   for (const cls of classes) {
     const label = formatClassLabel(cls)
@@ -76,6 +95,47 @@ export function generateTimetable(gradeSubjects, assignments, classes, teachers,
     //   but only as a double period (consecutive), and never more than 2/day.
     const perDayCounts = new Map() // key: `${subjectId}:${day}` -> count
     const perWeekCounts = new Map() // key: subjectId -> count
+
+    // Pin user-defined fixed lessons first so the random filler works around them.
+    for (const rule of fixedRules) {
+      const periodIndex = parseInt(rule.period, 10) - 1
+      if (schedule[label][rule.day][periodIndex] !== null) continue
+
+      const subj = subjectSlots.find((s) => s.catalogId === rule.catalogId)
+      if (!subj) continue
+
+      const overrideTeacher = rule.teacherId
+        ? teachers.find((t) => t.id === rule.teacherId)
+        : null
+      const teacher = overrideTeacher || subj.teacher
+      if (teacher) {
+        let teacherBusy = false
+        for (const clsSchedule of Object.values(schedule)) {
+          if (clsSchedule[rule.day]?.[periodIndex]?.teacherId === teacher.id) {
+            teacherBusy = true
+            break
+          }
+        }
+        if (teacherBusy) {
+          warnings.push(
+            `${label} - ${subj.name}: fixed lesson on ${rule.day} lesson ${rule.period} skipped because ${teacher.name} is already teaching another class then.`,
+          )
+          continue
+        }
+      }
+
+      schedule[label][rule.day][periodIndex] = {
+        subject: subj.name,
+        teacher: teacher?.name || 'Unassigned',
+        teacherId: teacher?.id || null,
+        subjectId: subj.id,
+      }
+      if (subj.remaining > 0) subj.remaining--
+      if (teacher) teacherLoad[teacher.id]++
+      const perDayKey = `${subj.id}:${rule.day}`
+      perDayCounts.set(perDayKey, (perDayCounts.get(perDayKey) || 0) + 1)
+      perWeekCounts.set(subj.id, (perWeekCounts.get(subj.id) || 0) + 1)
+    }
 
     for (const slot of allSlots) {
       if (subjectSlots.every((s) => s.remaining === 0)) break

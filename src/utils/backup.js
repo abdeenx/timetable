@@ -15,6 +15,8 @@ const FIELDS = [
   'weekLength',
   'firstPeriodStartTime',
   'breaks',
+  'periodsPerDay',
+  'fixedSlots',
 ]
 
 // Older backups stored per-class subjects; keep them on restore so they can be migrated.
