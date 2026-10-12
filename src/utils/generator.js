@@ -129,6 +129,7 @@ export function generateTimetable(
         teacher: teacher?.name || 'Unassigned',
         teacherId: teacher?.id || null,
         subjectId: subj.id,
+        catalogId: subj.catalogId,
       }
       if (subj.remaining > 0) subj.remaining--
       if (teacher) teacherLoad[teacher.id]++
@@ -195,6 +196,7 @@ export function generateTimetable(
             teacher: teacher?.name || 'Unassigned',
             teacherId: teacher?.id || null,
             subjectId,
+            catalogId: subj.catalogId,
           }
           subj.remaining--
           if (teacher) teacherLoad[teacher.id]++

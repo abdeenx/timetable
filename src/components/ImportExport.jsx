@@ -7,7 +7,7 @@ import {
 } from '../utils/excel'
 import { downloadBackup, parseBackup, readFileAsText } from '../utils/backup'
 
-export default function ExcelImportExport({
+export default function ImportExport({
   classes,
   teachers,
   subjectCatalog,
@@ -16,6 +16,7 @@ export default function ExcelImportExport({
   onImport,
   onRestore,
   onError,
+  onReset,
 }) {
   const fileInputRef = useRef(null)
   const backupInputRef = useRef(null)
@@ -125,7 +126,7 @@ export default function ExcelImportExport({
       setWarnings(result.warnings)
       setStatus({
         type: 'success',
-        message: `Imported ${result.classes.length} classes, ${result.teachers.length} teachers, and ${result.subjectCatalog.length} subjects. Set lessons and assign teachers on the Subjects tab.`,
+        message: `Imported ${result.classes.length} classes, ${result.teachers.length} teachers, and ${result.subjectCatalog.length} subjects. Set lessons and assign teachers in Setup.`,
       })
     } catch {
       setStatus({
@@ -136,32 +137,32 @@ export default function ExcelImportExport({
   }
 
   return (
-    <div className="form-container excel-panel">
-      <h2>Excel import / export</h2>
+    <details className="form-container excel-panel">
+      <summary>Import / export</summary>
       <p className="form-help">
-        Download the template and fill in three separate lists: classes, teachers, and subject names.
-        After upload, go to the Subjects tab to set lessons per grade and assign teachers.
+        Import classes, teachers, and subjects from a spreadsheet, export the lists back
+        out, or move everything — including assignments and settings — between devices.
       </p>
 
       <div className="excel-actions">
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          Import spreadsheet
+        </button>
         <button type="button" className="btn-secondary" onClick={handleDownloadTemplate}>
-          Download blank template
+          Download template
         </button>
         <button
           type="button"
           className="btn-secondary"
           onClick={handleDownloadData}
           disabled={!hasData}
-          title={hasData ? 'Export lists to Excel' : 'Add data first to export'}
+          title={hasData ? 'Export classes, teachers, and subjects to Excel' : 'Add data first to export'}
         >
-          Export lists
-        </button>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          Upload filled Excel
+          Export spreadsheet
         </button>
         <input
           ref={fileInputRef}
@@ -172,37 +173,30 @@ export default function ExcelImportExport({
         />
       </div>
 
-      <div className="excel-backup">
-        <h3>Backup &amp; migration</h3>
-        <p className="form-help">
-          Export everything (classes, teachers, subjects, lessons, teacher assignments, breaks, and schedule
-          settings) into a single compact file, then restore it on another device.
-        </p>
-        <div className="excel-actions">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={handleExportBackup}
-            disabled={!hasData}
-            title={hasData ? 'Export all data to a backup file' : 'Add data first to export'}
-          >
-            Export all data
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => backupInputRef.current?.click()}
-          >
-            Restore from backup
-          </button>
-          <input
-            ref={backupInputRef}
-            type="file"
-            accept=".json,application/json"
-            className="excel-file-input"
-            onChange={handleBackupFileChange}
-          />
-        </div>
+      <div className="excel-actions" style={{ marginTop: 8 }}>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={handleExportBackup}
+          disabled={!hasData}
+          title={hasData ? 'Export all data to a backup file' : 'Add data first to export'}
+        >
+          Export full backup
+        </button>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => backupInputRef.current?.click()}
+        >
+          Restore from backup
+        </button>
+        <input
+          ref={backupInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="excel-file-input"
+          onChange={handleBackupFileChange}
+        />
       </div>
 
       {status && (
@@ -219,6 +213,19 @@ export default function ExcelImportExport({
           ))}
         </div>
       )}
-    </div>
+
+      {onReset && hasData && (
+        <div className="excel-danger">
+          <h3>Danger zone</h3>
+          <p className="form-help">
+            Delete every class, teacher, subject, assignment, and setting on this device.
+            This cannot be undone — download a full backup first.
+          </p>
+          <button type="button" className="btn-danger-solid" onClick={onReset}>
+            Delete all data
+          </button>
+        </div>
+      )}
+    </details>
   )
 }

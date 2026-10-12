@@ -3,30 +3,33 @@ import { fileTimestamp } from '../utils/datetime'
 import { safeFilename } from '../utils/filenames'
 import { naturalCompare } from '../utils/classes'
 
+const WEEK_DAY_OPTIONS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+]
+
 export default function TimetableView({
   timetable,
   days,
-  periods,
+  periodsPerDay = 8,
+  onPeriodsPerDayChange,
   periodDurationMinutes = 45,
   onPeriodDurationMinutesChange,
   breaks = [],
   onBreaksChange,
+  fixedSlots = [],
+  onFixedSlotsChange,
   weekStartDay,
   weekLength,
   firstPeriodStartTime,
   onWeekSettingsChange,
 }) {
-  if (!timetable) {
-    return (
-      <div className="form-container">
-        <h2>Timetable</h2>
-        <p className="form-help">Add subjects, classes, and teachers — then click "Generate Timetable".</p>
-        <div className="empty-state">📅 No timetable generated yet.</div>
-      </div>
-    )
-  }
-
-  const { schedule, warnings } = timetable
+  const lessonsPerDay = periodsPerDay
   const normalizedBreaks = [...(breaks || [])]
     .filter((b) => Number.isFinite(parseInt(b.afterPeriod, 10)))
     .map((b) => ({
@@ -34,21 +37,11 @@ export default function TimetableView({
       afterPeriod: parseInt(b.afterPeriod, 10),
       durationMinutes: parseInt(b.durationMinutes, 10),
     }))
-    .filter((b) => b.afterPeriod >= 1 && b.afterPeriod <= periods - 1)
+    .filter((b) => b.afterPeriod >= 1 && b.afterPeriod <= lessonsPerDay - 1)
     .sort((a, b) => a.afterPeriod - b.afterPeriod)
 
-  const weekDayOptions = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-  ]
-
   const periodTimes = buildPeriodTimes({
-    periods,
+    periods: lessonsPerDay,
     firstPeriodStartTime,
     periodDurationMinutes,
     breaks: normalizedBreaks,
@@ -61,7 +54,7 @@ export default function TimetableView({
         id: Date.now().toString(),
         label: 'Break',
         durationMinutes: 15,
-        afterPeriod: Math.min(2, periods - 1),
+        afterPeriod: Math.min(2, lessonsPerDay - 1),
       },
     ]
     onBreaksChange?.(next)
@@ -76,9 +69,45 @@ export default function TimetableView({
     onBreaksChange?.(normalizedBreaks.filter((b) => b.id !== id))
   }
 
+  const findPin = (cell, day, periodIndex) =>
+    cell?.catalogId
+      ? fixedSlots.find(
+          (f) =>
+            f.day === day &&
+            parseInt(f.period, 10) === periodIndex + 1 &&
+            f.catalogId === cell.catalogId,
+        )
+      : null
+
+  const togglePin = (cell, day, periodIndex) => {
+    if (!cell?.catalogId || !onFixedSlotsChange) return
+    const existing = findPin(cell, day, periodIndex)
+    if (existing) {
+      onFixedSlotsChange(fixedSlots.filter((f) => f.id !== existing.id))
+      return
+    }
+    onFixedSlotsChange([
+      ...fixedSlots,
+      {
+        id: `pin-${Date.now()}`,
+        day,
+        period: periodIndex + 1,
+        catalogId: cell.catalogId,
+        teacherId: cell.teacherId || null,
+      },
+    ])
+  }
+
+  const schedule = timetable?.schedule
+  const warnings = timetable?.warnings || []
+
   return (
     <div className="form-container">
       <h2>Timetable</h2>
+      <p className="form-help">
+        Set the shape of the week, then click Generate Timetable. Click any lesson in the
+        result to pin it in place so it stays there when you regenerate.
+      </p>
 
       <div className="form-row" style={{ marginTop: 10 }}>
         <label className="label" htmlFor="period-duration">
@@ -98,6 +127,23 @@ export default function TimetableView({
           style={{ width: '110px' }}
         />
         <span className="label">minutes</span>
+
+        <label className="label" htmlFor="lessons-per-day">
+          Lessons/day
+        </label>
+        <input
+          id="lessons-per-day"
+          type="number"
+          min="1"
+          max="16"
+          value={lessonsPerDay}
+          onChange={(e) => {
+            const next = parseInt(e.target.value, 10)
+            const safe = Number.isFinite(next) ? Math.min(16, Math.max(1, next)) : 8
+            onPeriodsPerDayChange?.(safe)
+          }}
+          style={{ width: '110px' }}
+        />
       </div>
 
       <div className="form-row" style={{ marginTop: 6 }}>
@@ -114,7 +160,7 @@ export default function TimetableView({
           }
           style={{ maxWidth: 220 }}
         >
-          {weekDayOptions.map((d) => (
+          {WEEK_DAY_OPTIONS.map((d) => (
             <option key={d} value={d}>
               {d}
             </option>
@@ -202,7 +248,7 @@ export default function TimetableView({
                     onChange={(e) => updateBreak(b.id, { afterPeriod: parseInt(e.target.value, 10) })}
                     style={{ maxWidth: 180 }}
                   >
-                    {Array.from({ length: Math.max(0, periods - 1) }, (_, i) => i + 1).map((p) => (
+                    {Array.from({ length: Math.max(0, lessonsPerDay - 1) }, (_, i) => i + 1).map((p) => (
                       <option key={p} value={p}>
                         {p}-{p + 1}
                       </option>
@@ -219,99 +265,142 @@ export default function TimetableView({
           </tbody>
         </table>
       )}
-      
-      {warnings && warnings.length > 0 && (
-        <div className="warnings">
-          <strong>⚠️ Warnings:</strong>
-          {warnings.map((w, i) => (
-            <p key={i}>{w}</p>
-          ))}
+
+      {fixedSlots.length > 0 && (
+        <div className="pin-bar">
+          <span>
+            📌 {fixedSlots.length} pinned lesson{fixedSlots.length === 1 ? '' : 's'} — applied
+            for every class that takes the subject when you generate again.
+          </span>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => onFixedSlotsChange?.([])}
+          >
+            Clear pins
+          </button>
         </div>
       )}
 
-      <div className="timetable-print">
-        <button className="btn-secondary" onClick={() => window.print()}>
-          🖨️ Print Timetable
-        </button>
-        <button
-          className="btn-secondary"
-          onClick={() => {
-            const csv = timetableToCSV(schedule, days, periods, normalizedBreaks)
-            downloadCSV(csv)
-          }}
-        >
-          📥 Download CSV
-        </button>
-      </div>
-
-      {Object.keys(schedule).sort(naturalCompare).map(className => (
-        <div key={className} className="class-timetable">
-          <h3>{className}</h3>
-          <div className="table-scroll">
-            <table className="timetable-grid">
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  {Array.from({ length: periods }, (_, p) => {
-                    const afterPeriod = p + 1
-                    const breaksAfter = normalizedBreaks.filter((b) => b.afterPeriod === afterPeriod)
-                    const timeLabel =
-                      periodTimes[p] ? `${periodTimes[p].start}-${periodTimes[p].end}` : ''
-                    return (
-                      <Fragment key={`head-p-${p}`}>
-                        <th>
-                          Lesson {p + 1}
-                          {timeLabel ? ` (${timeLabel})` : ''}
-                        </th>
-                        {breaksAfter.map((b) => (
-                          <th key={`head-break-${b.id}`} className="break-cell break-label">
-                            {b.label}{' '}
-                            {periodTimes[p]
-                              ? `(${periodTimes[p].end}-${addMinutes(periodTimes[p].end, b.durationMinutes)})`
-                              : `(${b.durationMinutes}m)`}
-                          </th>
-                        ))}
-                      </Fragment>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {days.map((d) => (
-                  <tr key={d}>
-                    <td className="period-num">{d}</td>
-                    {Array.from({ length: periods }, (_, p) => {
-                      const afterPeriod = p + 1
-                      const breaksAfter = normalizedBreaks.filter((b) => b.afterPeriod === afterPeriod)
-                      const cell = schedule[className]?.[d]?.[p]
-                      return (
-                        <Fragment key={`cell-${d}-${p}`}>
-                          <td className={cell ? 'has-class' : ''}>
-                            {cell ? (
-                              <>
-                                <div className="cell-subject">{cell.subject}</div>
-                                <div className="cell-teacher">{cell.teacher}</div>
-                              </>
-                            ) : cell === '' ? '' : null}
-                          </td>
-                          {breaksAfter.map((b) => (
-                            <td key={`cell-break-${d}-${b.id}`} className="break-cell">
-                              {b.label}
-                            </td>
-                          ))}
-                        </Fragment>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {!timetable ? (
+        <div className="empty-state">
+          📅 No timetable generated yet. Add subjects, classes, and teachers — then click
+          &quot;Generate Timetable&quot;.
         </div>
-      ))}
+      ) : (
+        <>
+          {warnings.length > 0 && (
+            <div className="warnings">
+              <strong>⚠️ Warnings:</strong>
+              {warnings.map((w, i) => (
+                <p key={i}>{w}</p>
+              ))}
+            </div>
+          )}
 
-      {Object.keys(schedule).length === 0 && (
-        <div className="empty-state">No timetable generated. Add data and try again.</div>
+          <div className="timetable-print">
+            <button className="btn-secondary" onClick={() => window.print()}>
+              🖨️ Print Timetable
+            </button>
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                const csv = timetableToCSV(schedule, days, lessonsPerDay, normalizedBreaks)
+                downloadCSV(csv)
+              }}
+            >
+              📥 Download CSV
+            </button>
+          </div>
+
+          {Object.keys(schedule).sort(naturalCompare).map((className) => (
+            <div key={className} className="class-timetable">
+              <h3>{className}</h3>
+              <div className="table-scroll">
+                <table className="timetable-grid">
+                  <thead>
+                    <tr>
+                      <th>Day</th>
+                      {Array.from({ length: lessonsPerDay }, (_, p) => {
+                        const afterPeriod = p + 1
+                        const breaksAfter = normalizedBreaks.filter((b) => b.afterPeriod === afterPeriod)
+                        const timeLabel =
+                          periodTimes[p] ? `${periodTimes[p].start}-${periodTimes[p].end}` : ''
+                        return (
+                          <Fragment key={`head-p-${p}`}>
+                            <th>
+                              Lesson {p + 1}
+                              {timeLabel ? ` (${timeLabel})` : ''}
+                            </th>
+                            {breaksAfter.map((b) => (
+                              <th key={`head-break-${b.id}`} className="break-cell break-label">
+                                {b.label}{' '}
+                                {periodTimes[p]
+                                  ? `(${periodTimes[p].end}-${addMinutes(periodTimes[p].end, b.durationMinutes)})`
+                                  : `(${b.durationMinutes}m)`}
+                              </th>
+                            ))}
+                          </Fragment>
+                        )
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {days.map((d) => (
+                      <tr key={d}>
+                        <td className="period-num">{d}</td>
+                        {Array.from({ length: lessonsPerDay }, (_, p) => {
+                          const afterPeriod = p + 1
+                          const breaksAfter = normalizedBreaks.filter((b) => b.afterPeriod === afterPeriod)
+                          const cell = schedule[className]?.[d]?.[p]
+                          const pinned = Boolean(findPin(cell, d, p))
+                          return (
+                            <Fragment key={`cell-${d}-${p}`}>
+                              <td className={cell ? `has-class${pinned ? ' pinned' : ''}` : ''}>
+                                {cell ? (
+                                  <button
+                                    type="button"
+                                    className="cell-toggle"
+                                    onClick={() => togglePin(cell, d, p)}
+                                    aria-pressed={pinned}
+                                    title={
+                                      pinned
+                                        ? 'Unpin this lesson'
+                                        : 'Pin this lesson so it stays here when you regenerate'
+                                    }
+                                  >
+                                    <span className="cell-subject">{cell.subject}</span>
+                                    <span className="cell-teacher">{cell.teacher}</span>
+                                    {pinned && (
+                                      <span className="cell-pin" aria-hidden="true">
+                                        📌
+                                      </span>
+                                    )}
+                                  </button>
+                                ) : cell === '' ? (
+                                  ''
+                                ) : null}
+                              </td>
+                              {breaksAfter.map((b) => (
+                                <td key={`cell-break-${d}-${b.id}`} className="break-cell">
+                                  {b.label}
+                                </td>
+                              ))}
+                            </Fragment>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+
+          {Object.keys(schedule).length === 0 && (
+            <div className="empty-state">No timetable generated. Add data and try again.</div>
+          )}
+        </>
       )}
     </div>
   )

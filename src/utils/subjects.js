@@ -44,6 +44,89 @@ export function getClassSubjectLabel(offering, classes, formatClassLabel) {
   return cls ? `${offering.name} — ${formatClassLabel(cls)}` : offering.name
 }
 
+// A teacher can cover an offering when they teach its subject and are available
+// for its grade. An empty availableGrades list means "all grades".
+export function isTeacherEligible(teacher, offering) {
+  if (!teacher || !offering) return false
+  const teaches =
+    Array.isArray(teacher.subjectCatalogIds) &&
+    teacher.subjectCatalogIds.includes(offering.catalogId)
+  const grades = teacher.availableGrades || []
+  const gradeOk = !grades.length || grades.includes(offering.grade)
+  return teaches && gradeOk
+}
+
+export function eligibleTeachersFor(teachers = [], offering) {
+  return teachers.filter((t) => isTeacherEligible(t, offering))
+}
+
+// Fill in teacher assignments for offerings that don't have one, so Generate
+// doesn't block on manual bookkeeping. Manual choices are kept; only gaps are
+// filled. Picks the eligible teacher with the most remaining weekly capacity,
+// tie-broken by current load then name, to spread work evenly.
+// Returns the (possibly new) assignment list, how many were added, and the
+// offerings no teacher can cover.
+export function autoAssignTeachers(
+  gradeSubjects = [],
+  classes = [],
+  assignments = [],
+  teachers = [],
+) {
+  const offerings = buildOfferings(gradeSubjects, classes)
+  const offeringById = new Map(offerings.map((o) => [o.id, o]))
+
+  const loadByTeacher = new Map(teachers.map((t) => [t.id, 0]))
+  const assignedOfferingIds = new Set()
+
+  for (const a of assignments) {
+    if (!a.teacherId) continue
+    assignedOfferingIds.add(a.offeringId)
+    const offering = offeringById.get(a.offeringId)
+    if (offering) {
+      loadByTeacher.set(a.teacherId, (loadByTeacher.get(a.teacherId) || 0) + offering.hoursPerWeek)
+    }
+  }
+
+  const next = [...assignments]
+  const unresolved = []
+  let added = 0
+
+  for (const offering of offerings) {
+    if (assignedOfferingIds.has(offering.id)) continue
+
+    const eligible = eligibleTeachersFor(teachers, offering)
+    if (eligible.length === 0) {
+      unresolved.push(offering)
+      continue
+    }
+
+    eligible.sort((a, b) => {
+      const remainingA =
+        (Number.isFinite(a.maxHoursPerWeek) ? a.maxHoursPerWeek : Infinity) -
+        (loadByTeacher.get(a.id) || 0)
+      const remainingB =
+        (Number.isFinite(b.maxHoursPerWeek) ? b.maxHoursPerWeek : Infinity) -
+        (loadByTeacher.get(b.id) || 0)
+      if (remainingB !== remainingA) return remainingB - remainingA
+      const loadA = loadByTeacher.get(a.id) || 0
+      const loadB = loadByTeacher.get(b.id) || 0
+      if (loadA !== loadB) return loadA - loadB
+      return String(a.name).localeCompare(String(b.name))
+    })
+
+    const chosen = eligible[0]
+    loadByTeacher.set(chosen.id, (loadByTeacher.get(chosen.id) || 0) + offering.hoursPerWeek)
+
+    const existingIndex = next.findIndex((a) => a.offeringId === offering.id)
+    const record = { id: `auto-${offering.id}`, offeringId: offering.id, teacherId: chosen.id }
+    if (existingIndex >= 0) next[existingIndex] = record
+    else next.push(record)
+    added += 1
+  }
+
+  return { assignments: next, added, unresolved }
+}
+
 // Legacy: very old data stored a flat `subjects` array (one row per subject+class+teacher).
 export function migrateLegacySubjects(subjects = []) {
   const classSubjects = []

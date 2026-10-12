@@ -1,17 +1,15 @@
 import { useState, useCallback, useEffect } from 'react'
-import SubjectForm from './components/SubjectForm'
-import ClassForm from './components/ClassForm'
-import TeacherForm from './components/TeacherForm'
+import SetupWorkspace from './components/SetupWorkspace'
 import TimetableView from './components/TimetableView'
-import SiteSettings from './components/SiteSettings'
 import Sidebar from './components/Sidebar'
 import InstallPrompt from './components/InstallPrompt'
-import ExcelImportExport from './components/ExcelImportExport'
+import ImportExport from './components/ImportExport'
 import { generateTimetable } from './utils/generator'
 import {
   migrateLegacySubjects,
   migrateClassSubjectsToGrade,
   buildOfferings,
+  autoAssignTeachers,
 } from './utils/subjects'
 import './App.css'
 
@@ -106,7 +104,7 @@ function migrateTeachers(rawTeachers, legacyClassSubjects, classes) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('subjects')
+  const [activeTab, setActiveTab] = useState('setup')
   const [subjectCatalog, setSubjectCatalog] = useState([])
   const [gradeSubjects, setGradeSubjects] = useState([])
   const [assignments, setAssignments] = useState([])
@@ -238,6 +236,20 @@ export default function App() {
     ],
   )
 
+  // Apply a batch of setup changes and persist once, so multi-field actions
+  // (e.g. adding a new subject to a grade) can't save a stale snapshot.
+  const handleSetupChange = useCallback(
+    (patch) => {
+      if (patch.classes !== undefined) setClasses(patch.classes)
+      if (patch.subjectCatalog !== undefined) setSubjectCatalog(patch.subjectCatalog)
+      if (patch.gradeSubjects !== undefined) setGradeSubjects(patch.gradeSubjects)
+      if (patch.assignments !== undefined) setAssignments(patch.assignments)
+      if (patch.teachers !== undefined) setTeachers(patch.teachers)
+      saveData(patch)
+    },
+    [saveData],
+  )
+
   const handleGenerate = useCallback(() => {
     setError('')
     if (subjectCatalog.length === 0 || classes.length === 0 || teachers.length === 0) {
@@ -245,7 +257,7 @@ export default function App() {
       return
     }
     if (gradeSubjects.length === 0) {
-      setError('Add at least one subject with weekly lessons per grade on the Subjects tab.')
+      setError('Add at least one subject with weekly lessons in Setup.')
       return
     }
     const offerings = buildOfferings(gradeSubjects, classes)
@@ -253,30 +265,42 @@ export default function App() {
       setError('No classes belong to the grades you defined subjects for. Add classes to those grades.')
       return
     }
-    const unassigned = offerings.filter(
-      (o) => !assignments.some((a) => a.offeringId === o.id && a.teacherId),
+    // Fill missing teacher assignments so generating doesn't block on manual
+    // bookkeeping. Manual choices are kept; only gaps are filled.
+    const { assignments: resolvedAssignments, added, unresolved } = autoAssignTeachers(
+      gradeSubjects,
+      classes,
+      assignments,
+      teachers,
     )
-    if (unassigned.length > 0) {
-      setError('Assign a teacher to every subject/class offering before generating.')
-      setActiveTab('subjects')
-      return
+    if (added > 0) {
+      setAssignments(resolvedAssignments)
+      saveData({ assignments: resolvedAssignments })
     }
+
     try {
       const result = generateTimetable(
         gradeSubjects,
-        assignments,
+        resolvedAssignments,
         classes,
         teachers,
         days,
         periodsPerDay,
         fixedSlots,
       )
+      if (unresolved.length > 0) {
+        setError(
+          `${unresolved.length} subject/class offering${
+            unresolved.length === 1 ? '' : 's'
+          } have no eligible teacher — the timetable marks them "Unassigned". Add a teacher for those subjects or grades.`,
+        )
+      }
       setTimetable(result)
       setActiveTab('timetable')
     } catch (e) {
       setError(e.message)
     }
-  }, [subjectCatalog, gradeSubjects, assignments, classes, teachers, days, periodsPerDay, fixedSlots])
+  }, [subjectCatalog, gradeSubjects, assignments, classes, teachers, days, periodsPerDay, fixedSlots, saveData])
 
   const handleReset = useCallback(() => {
     if (confirm('Delete all data? This cannot be undone.')) {
@@ -328,7 +352,7 @@ export default function App() {
         teachers: teach,
         breaks: importedBreaks || breaks,
       })
-      setActiveTab('subjects')
+      setActiveTab('setup')
     },
     [saveData, breaks],
   )
@@ -429,16 +453,13 @@ export default function App() {
             <button className="btn-primary" onClick={handleGenerate}>
               Generate Timetable
             </button>
-            <button className="btn-secondary" onClick={handleReset}>
-              Reset All
-            </button>
           </div>
         </header>
 
         {error && <div className="error-banner">{error}</div>}
 
         <div className="content">
-          <ExcelImportExport
+          <ImportExport
             classes={classes}
             teachers={teachers}
             subjectCatalog={subjectCatalog}
@@ -460,54 +481,27 @@ export default function App() {
             onImport={handleExcelImport}
             onRestore={handleRestoreBackup}
             onError={setError}
+            onReset={handleReset}
           />
-          {activeTab === 'subjects' && (
-            <SubjectForm
+          {activeTab === 'setup' && (
+            <SetupWorkspace
+              classes={classes}
               subjectCatalog={subjectCatalog}
-              onCatalogChange={(catalog) => {
-                setSubjectCatalog(catalog)
-                saveData({ subjectCatalog: catalog })
-              }}
               gradeSubjects={gradeSubjects}
-              onGradeSubjectsChange={(gradeSubs) => {
-                setGradeSubjects(gradeSubs)
-                saveData({ gradeSubjects: gradeSubs })
-              }}
               assignments={assignments}
-              onAssignmentsChange={(assign) => {
-                setAssignments(assign)
-                saveData({ assignments: assign })
-              }}
               teachers={teachers}
-              classes={classes}
-            />
-          )}
-          {activeTab === 'classes' && (
-            <ClassForm
-              classes={classes}
-              gradeSubjects={gradeSubjects}
-              onChange={(c) => {
-                setClasses(c)
-                saveData({ classes: c })
-              }}
-            />
-          )}
-          {activeTab === 'teachers' && (
-            <TeacherForm
-              teachers={teachers}
-              subjectCatalog={subjectCatalog}
-              classes={classes}
-              onChange={(t) => {
-                setTeachers(t)
-                saveData({ teachers: t })
-              }}
+              onChange={handleSetupChange}
             />
           )}
           {activeTab === 'timetable' && (
             <TimetableView
               timetable={timetable}
               days={days}
-              periods={periodsPerDay}
+              periodsPerDay={periodsPerDay}
+              onPeriodsPerDayChange={(next) => {
+                setPeriodsPerDay(next)
+                saveData({ periodsPerDay: next })
+              }}
               periodDurationMinutes={periodDurationMinutes}
               onPeriodDurationMinutesChange={(nextMinutes) => {
                 setPeriodDurationMinutes(nextMinutes)
@@ -531,23 +525,11 @@ export default function App() {
                 setBreaks(nextBreaks)
                 saveData({ breaks: nextBreaks })
               }}
-            />
-          )}
-          {activeTab === 'settings' && (
-            <SiteSettings
-              periodsPerDay={periodsPerDay}
-              onPeriodsPerDayChange={(next) => {
-                setPeriodsPerDay(next)
-                saveData({ periodsPerDay: next })
-              }}
               fixedSlots={fixedSlots}
               onFixedSlotsChange={(next) => {
                 setFixedSlots(next)
                 saveData({ fixedSlots: next })
               }}
-              subjectCatalog={subjectCatalog}
-              teachers={teachers}
-              days={days}
             />
           )}
         </div>

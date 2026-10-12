@@ -43,7 +43,7 @@ const INSTRUCTIONS = [
   [],
   ['Each sheet is a simple list. Do not repeat names across sheets.'],
   [
-    'After import, use the Subjects tab in the app to set lessons per grade and assign teachers.',
+    'After import, open the Setup tab in the app to set lessons per grade and assign teachers.',
   ],
   [],
   ['Classes sheet'],
@@ -65,7 +65,7 @@ const INSTRUCTIONS = [
   [],
   ['Tips'],
   ['  • Keep sheet names unchanged (Classes, Teachers, Subjects, Breaks).'],
-  ['  • Set lessons per grade and assign teachers in the web app after upload.'],
+  ['  • Set lessons per grade and assign teachers in the Setup tab after upload.'],
 ]
 
 let idCounter = 0

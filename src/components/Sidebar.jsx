@@ -1,10 +1,7 @@
 export default function Sidebar({ activeTab, onTabChange }) {
   const tabs = [
-    { id: 'subjects', label: '📚 Subjects', icon: '📚' },
-    { id: 'classes', label: '🏫 Classes', icon: '🏫' },
-    { id: 'teachers', label: '👩‍🏫 Teachers', icon: '👩‍🏫' },
+    { id: 'setup', label: '🏫 Setup', icon: '🏫' },
     { id: 'timetable', label: '📅 Timetable', icon: '📅' },
-    { id: 'settings', label: '⚙️ Site Settings', icon: '⚙️' },
   ]
 
   return (
